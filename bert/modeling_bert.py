@@ -52,6 +52,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from transformers.models.bert.configuration_bert import BertConfig
+from MRL import *
 
 
 logger = logging.get_logger(__name__)
@@ -687,12 +688,16 @@ class BertLMPredictionHead(nn.Module):
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        if not config.nesting_dim:
+            self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        self.bias = nn.Parameter(torch.zeros(config.vocab_size))
+            self.bias = nn.Parameter(torch.zeros(config.vocab_size))
 
-        # Need a link between the two variables so that the bias is correctly resized with `resize_token_embeddings`
-        self.decoder.bias = self.bias
+            # Need a link between the two variables so that the bias is correctly resized with `resize_token_embeddings`
+            self.decoder.bias = self.bias
+        else:
+            self.decoder = MRL_Linear_Layer(config.nesting_dim, out_dim=config.vocab_size,
+                                            efficient=config.mrl_efficient)
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
@@ -1317,8 +1322,10 @@ class BertForMaskedLM(BertPreTrainedModel):
             )
 
         self.bert = BertModel(config, add_pooling_layer=False)
+
         self.cls = BertOnlyMLMHead(config)
 
+        self.nesting_dim = config.nesting_dim
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1378,10 +1385,17 @@ class BertForMaskedLM(BertPreTrainedModel):
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
 
+
+
         masked_lm_loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+            if self.nesting_dim:
+                loss_fct = Matryoshka_CE_Loss(vocab_size=self.config.vocab_size)
+                masked_lm_loss = loss_fct(prediction_scores, labels.view(-1))
+            else:
+
+                loss_fct = CrossEntropyLoss()  # -100 index = padding token
+                masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]

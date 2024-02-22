@@ -6,7 +6,8 @@ References
 4. https://huggingface.co/docs/transformers/main/en/tasks/masked_language_modeling
 '''
 from datasets import load_from_disk
-from transformers import AutoTokenizer, AutoConfig, AutoModelForMaskedLM
+from transformers import AutoTokenizer, AutoConfig
+from bert.modeling_bert import BertForMaskedLM
 import torch
 from torch.optim import AdamW
 from transformers import get_scheduler
@@ -20,7 +21,6 @@ import wandb
 from tqdm.auto import tqdm
 from decimal import Decimal
 import datetime
-import json
 
 class MLMTrainer:
     def __init__(self, tokenizer, model, args):
@@ -35,7 +35,7 @@ class MLMTrainer:
         self.model, self.optimizer, self.lr_scheduler, self.train_dataloader, self.val_dataloader =  self.accelerator._prepare_deepspeed(
             self.model, self.optimizer, self.lr_scheduler, self.train_dataloader, self.val_dataloader
         )
-        self.experiment_name = (f'{self.args.model_name}_mrl{self.args.mrl}_'
+        self.experiment_name = (f'{self.args.model_name}_mrl{self.args.mrl}{self.args.mrl_efficient}_'
                                 f'bs{self.args.batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}')
         self.logger = get_logger(self.experiment_name)
 
@@ -92,9 +92,7 @@ class MLMTrainer:
                 for step, batch in enumerate(self.val_dataloader):
                     with torch.no_grad():
                         outputs = self.model(**batch)
-                    loss = outputs.loss
-                    losses.append(self.accelerator.gather(loss.repeat(batch['input_ids'].shape[0])))
-                    eval_progress.update(1)
+
 
                 self.accelerator.wait_for_everyone()
 
@@ -121,28 +119,29 @@ if __name__ == '__main__':
     def str2bool(flag):
         if isinstance(flag, bool):
             return flag
-        elif flag.lower() in ('yes', 'true', 't', 'y', '1'):
+        elif flag.lower() in ['yes', 'true', 't', 'y', '1']:
             return True
-        elif flag.lower in ('no', 'false', 'f', 'n', '0'):
+        elif flag.lower() in ['no', 'false', 'f', 'n', '0']:
             return False
         else:
-            raise argparse.ArgumentTypeError('Boolean value expected.')
+            raise argparse.ArgumentTypeError('Boolean answer expected.')
 
     def str2list(dims):
         return dims.split[',']
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, help='path to processed mlm dataset', default='../bookcorpus_train')
+    parser.add_argument('--data_path', type=str, help='path to processed mlm dataset', default='bert/bookcorpus_train')
     parser.add_argument('--output_path', type=str, help='path to save logs and model weights', default='output_dir')
     parser.add_argument('--resume_train_from', type=str, help='path to saved checkpoint to resume training', default=None)
     parser.add_argument('--model_name', type=str, default='bert-base-uncased')
-    parser.add_argument('--mrl', type=str2bool, default=True)
-    parser.add_argument('--nesting_dim', type=str2list, default=[12,24,48,96,192,384,768])
+    parser.add_argument('--mrl', type=str2bool, default=False, help='whether to use MRL')
+    parser.add_argument('--mrl_efficient', type=str2bool, default=False)
+    parser.add_argument('--nesting_dim', type=str2list, default=[96,192,384,768])
     parser.add_argument('--batch_size', type=int, default=4, help='total batch size across multiple gpus/nodes')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
     parser.add_argument('--total_steps', type=int, default=1000000)
     parser.add_argument('--weight_decay', type=float, default=0.01)
-    parser.add_argument('--warmup_steps', type=int, default=10000)
+    parser.add_argument('--warmup_steps', type=int, default=2000)
     parser.add_argument('--num_proc', type=int, default=multiprocessing.cpu_count(), help='number of processes')
     parser.add_argument('--evaluation_interval', type=int, default=25000)
     parser.add_argument('--wandb_key', type=str, default=None, help='wandb api login key for remote login')
@@ -159,8 +158,14 @@ if __name__ == '__main__':
         config.nesting_dim = args.nesting_dim
     else:
         config.nesting_dim = None
+    config.mrl_efficient = args.mrl_efficient
 
-    model = AutoModelForMaskedLM.from_config(config=config)
+
+    model = BertForMaskedLM(config=config)
+
+
+
+
     trainer = MLMTrainer(tokenizer, model, args)
     trainer.train()
 
