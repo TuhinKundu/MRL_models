@@ -7,11 +7,6 @@ Adapted from https://github.com/mlfoundations/open_clip/blob/main/src/open_clip/
 Adapted from https://github.com/openai/CLIP. Originally MIT License, Copyright (c) 2021 OpenAI.
 """
 
-
-""" CLIP Model
-
-Adapted from https://github.com/openai/CLIP. Originally MIT License, Copyright (c) 2021 OpenAI.
-"""
 import copy
 import logging
 import math
