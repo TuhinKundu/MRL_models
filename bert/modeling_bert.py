@@ -696,7 +696,7 @@ class BertLMPredictionHead(nn.Module):
             # Need a link between the two variables so that the bias is correctly resized with `resize_token_embeddings`
             self.decoder.bias = self.bias
         else:
-            self.decoder = MRL_Linear_Layer(config.nesting_dim, out_dim=config.vocab_size,
+            self.decoder = MRL_Linear_Layer(config.nesting_dim, vocab_size=config.vocab_size,
                                             efficient=config.mrl_efficient)
 
     def forward(self, hidden_states):
@@ -1356,8 +1356,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         labels: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        mrl_nesting: Optional[list] = None
+        return_dict: Optional[bool] = None
     ) -> Union[Tuple[torch.Tensor], MaskedLMOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -1390,7 +1389,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             if self.nesting_dim:
-                loss_fct = Matryoshka_CE_Loss(vocab_size=self.config.vocab_size)
+                loss_fct = Matryoshka_MLM_Loss(vocab_size=self.config.vocab_size)
                 masked_lm_loss = loss_fct(prediction_scores, labels.view(-1))
             else:
 
