@@ -233,8 +233,8 @@ class CLIP(nn.Module):
     def __init__(
             self,
             embed_dim: int,
-            vision_cfg: CLIPVisionCfg,
             text_cfg: CLIPTextCfg,
+            vision_cfg: CLIPVisionCfg,
             quick_gelu: bool = False,
             init_logit_scale: float = np.log(1 / 0.07),
             init_logit_bias: Optional[float] = None,
@@ -245,7 +245,6 @@ class CLIP(nn.Module):
         self.output_dict = output_dict
 
         self.visual = _build_vision_tower(embed_dim, vision_cfg, quick_gelu, cast_dtype)
-
         text = _build_text_tower(embed_dim, text_cfg, quick_gelu, cast_dtype)
         self.transformer = text.transformer
         self.context_length = text.context_length
