@@ -21,8 +21,7 @@ import wandb
 from tqdm.auto import tqdm
 from decimal import Decimal
 import datetime, json
-import webdataset as wds
-import random
+import warnings
 import open_clip
 from clip_model.model import CLIP
 from clip_model.data import *
@@ -52,6 +51,18 @@ class PreTrainer:
 
         self.accelerator = accelerate.Accelerator(split_batches=True) # change grad acc and precision (mixed/bf16) in deepspeed config
 
+        num_devices = self.accelerator.num_processes
+        if self.args.global_batch_size and self.args.batch_size:
+            self.args.global_batch_size = self.args.batch_size * num_devices
+            warnings.warn(f'Global batch size set to {self.args.global_batch_size}. Using batch size * accelerator.num_processes (num devices)')
+        elif not (self.args.global_batch_size or self.args.batch_size):
+            warnings.warn(f'Global batch size and batch size arguments not set, using deepspeed config for batch size for MLM')
+            if self.args.clip:
+                raise AssertionError('set either global_batch_size or batch_size argument for CLIP')
+
+
+
+
         if self.args.mlm:
             self.train_dataloader, self.val_dataloader = self.load_data_for_mlm(self.args.data_path, self.args.global_batch_size, self.args.num_proc)
 
@@ -61,6 +72,7 @@ class PreTrainer:
         self.model, self.optimizer, self.lr_scheduler, self.train_dataloader, self.val_dataloader = self.accelerator._prepare_deepspeed(
             self.model, self.optimizer, self.lr_scheduler, self.train_dataloader, self.val_dataloader
         )
+
 
 
         self.dtype = self.model.get_data_types()[0]

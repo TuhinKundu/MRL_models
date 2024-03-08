@@ -23,6 +23,10 @@ config file [similar to this](https://github.com/TuhinKundu/MRL_models/blob/main
 code uses HF Accelerate like a wrapper around deepspeed backbone to provide wider range of support to models in 
 HF Transformers and Open CLIP libraries.
 
+#### MLM pretraining
+
+    accelerate launch --config_file bert/default_config.yaml run_pretraining.py --batch_size 2 --mrl yes --clip n --mlm y  --data_path ../bookcorpus_train/ --output_path output_dir/ --model_name bert-base-uncased 
+
 ##### Open_Clip pretraining
 
 Open CLIP pretraining has been integrated here with HF Accelerate (with deepspeed integration)
@@ -34,12 +38,14 @@ less than an hour to download.
 
 Example command to run clip pretraining
 
-    accelerate launch run_pretraining.py --batch_size 2 --mrl no --clip yes --data_path clip/cc3m/ --model_name ViT-B-32
-
-
+    accelerate launch --config_file clip/default_config.yaml run_pretraining.py --batch_size 8 --mrl yes --clip yes --data_path clip/cc3m/ --output_path output_dir/ --model_name ViT-B-32 --evaluation_interval 100
 
 Miscellaneous
 
 1. Check model name with `open_clip.list_models()` to pass argument for `model_name`. 
 Please check list of model names inside config folder in [open_clip](https://github.com/mlfoundations/open_clip/tree/main/src/open_clip/model_configs)
 github repository.You can also pass any custom model config supported by `open_clip`.
+2. In MLM, if you mention `train_batch_size` or `train_micro_batch_size_per_gpu` parameters in deepspeed config,
+it will overwrite the `global_batch_size` or `batch_size` parameters you pass as arguments. 
+In CLIP, we use OpenCLIP's dataloading strategy hence you **need** to pass either `global_batch_size` or `batch_size` parameters
+as the dataloader will ignore deepspeed parameters. Please use default `auto` parameter in deepspeed config for CLIP.
