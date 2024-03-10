@@ -64,9 +64,7 @@ class PreTrainer:
             self.model, self.optimizer, self.lr_scheduler, self.train_dataloader, self.val_dataloader
         )
 
-
         self.dtype = self.model.get_data_types()[0]
-        self.grad_acc_steps = self.accelerator.deepspeed_config['gradient_accumulation_steps']
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
                                 f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}')
@@ -97,7 +95,7 @@ class PreTrainer:
         location_shards = [location + shard for shard in location_shards]
         num_files = len(location_shards)
         num_shards = num_files//3
-        split_location = (num_shards//10)*3
+        split_location = (num_shards//40)*3 #taking 2.5% shards for eval
         location_shards.sort()
         val_shards = location_shards[:split_location]
         train_shards = location_shards[split_location:]
@@ -112,7 +110,6 @@ class PreTrainer:
                                                        is_train=True, tokenizer=self.tokenizer, return_dataset=True)
         train_dataloader = DataLoader(train_dataset, batch_size=args.world_size,#webdataset pipeline already handling batch size
                                       collate_fn=self.clip_batch_collator, num_workers=num_proc//2)
-
 
         val_dataset = get_wds_dataset(args=self.args, preprocess_img=self.val_image_processor,
                                                      is_train=False, tokenizer=self.tokenizer, return_dataset=True)
@@ -142,7 +139,7 @@ class PreTrainer:
         dataset = dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
         dataset = dataset.train_test_split(train_size=len(dataset)-int(0.1*len(dataset)), test_size=int(0.1*len(dataset)))
         train_dataloader = DataLoader(dataset['train'], batch_size=batch_size, shuffle=True, num_workers=num_proc//2)
-        val_dataloader = DataLoader(dataset['test'], batch_size=batch_size, shuffle=True, num_workers=num_proc//4)
+        val_dataloader = DataLoader(dataset['test'], batch_size=batch_size, shuffle=False, num_workers=num_proc//4)
         return train_dataloader, val_dataloader
 
     def print_time_log(self, iter, progress_bar):
@@ -188,7 +185,7 @@ class PreTrainer:
         for current_iter in range(init_step, self.args.total_steps):
             try:
                 batch = next(self.train_dataloader)
-            except StopIteration:
+            except:
                 self.train_dataloader = iter(self.train_dataloader)
                 batch = next(self.train_dataloader)
                 warnings.warn('StopIteration encountered. Restart train_dataloader.')
