@@ -25,7 +25,7 @@ HF Transformers and Open CLIP libraries.
 
 #### MLM pretraining
 
-    accelerate launch --config_file bert/default_config.yaml run_pretraining.py --batch_size 2 --mrl yes --clip n --mlm y  --data_path ../bookcorpus_train/ --output_path output_dir/ --model_name bert-base-uncased 
+    accelerate launch --config_file bert/default_config.yaml run_pretraining.py --batch_size 2 --mrl yes --clip n --mlm y  --data_path ../bookcorpus_train/ --output_path output_dir/ --model_name bert-base-uncased --total_steps 1000000
 
 ##### Open_Clip pretraining
 
@@ -38,7 +38,7 @@ less than an hour to download.
 
 Example command to run clip pretraining
 
-    accelerate launch --config_file clip/default_config.yaml run_pretraining.py --batch_size 8 --mrl yes --clip yes --data_path clip/cc3m/ --output_path output_dir/ --model_name ViT-B-32 --evaluation_interval 100
+    accelerate launch --config_file clip_model/default_config.yaml run_pretraining.py --batch_size 8 --mrl yes --clip yes --data_path clip/cc3m/ --output_path output_dir/ --model_name ViT-B-32 --epochs 32
 
 Miscellaneous
 
