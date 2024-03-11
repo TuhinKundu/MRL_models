@@ -66,9 +66,10 @@ class PreTrainer:
         )
 
         self.dtype = self.model.get_data_types()[0]
+        self.grad_acc_steps = self.accelerator.deepspeed_config['gradient_accumulation_steps']
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
-                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}')
+                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}')
 
     def clip_batch_collator(self,batch):
 
@@ -252,21 +253,29 @@ class PreTrainer:
                     self.accelerator.save_state(out_dir)
 
                     self.args.lr = self.optimizer.param_groups[0]['lr']
-                    artifact = wandb.Artifact(name=self.experiment_name, type='model')
-                    artifact.add_dir(out_dir)
-                    wandb_run.log_artifact(artifact)
+                    #artifact = wandb.Artifact(name=self.experiment_name, type='model')
+                    #artifact.add_dir(out_dir)
+                    #wandb_run.log_artifact(artifact)
 
                     with open(f'{out_dir}/args.json', 'w') as f:
                         json.dump(self.args.__dict__, f)
 
+                    if self.args.kube_pvc:
+                        os.system(f'rsync -avP {out_dir} {self.args.kube_pvc}')
+
 
         self.accelerator.save_state(out_dir)
-        artifact = wandb.Artifact(name=self.experiment_name, type='model')
-        artifact.add_dir(out_dir)
-        wandb_run.log_artifact(artifact)
-        progress_bar.update(1)
         with open(f'{out_dir}/args.json', 'w') as f:
             json.dump(self.args.__dict__, f)
+
+        if self.args.kube_pvc:
+            os.system(f'rsync -avP {out_dir} {self.args.kube_pvc}')
+
+        #artifact = wandb.Artifact(name=self.experiment_name, type='model')
+        #artifact.add_dir(out_dir)
+        #wandb_run.log_artifact(artifact)
+
+
 
 
 if __name__ == '__main__':
@@ -307,6 +316,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluation_interval', type=int, default=25000)
     parser.add_argument('--wandb_key', type=str, default=None, help='wandb api login key for remote login')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--kube_pvc', type=str, default=None, help='path for k8s pvc for permanent storage')
     args = parser.parse_args()
 
 
