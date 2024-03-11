@@ -28,6 +28,7 @@ from clip_model.model import CLIP
 from clip_model.data import *
 import MRL
 from utils import utils
+from itertools import cycle
 
 
 class PreTrainer:
@@ -94,8 +95,10 @@ class PreTrainer:
         location_shards = os.listdir(location)
         location_shards = [location + shard for shard in location_shards]
         num_files = len(location_shards)
-        num_shards = num_files//3
+        num_shards = num_files//3 #for each shard there are three files, tar, json, parquet. json is used to compute n_samples
         split_location = (num_shards//40)*3 #taking 2.5% shards for eval
+        if split_location == 0:
+            split_location = 3
         location_shards.sort()
         val_shards = location_shards[:split_location]
         train_shards = location_shards[split_location:]
@@ -106,17 +109,17 @@ class PreTrainer:
         args.workers = self.args.num_proc
         args.world_size = torch.cuda.device_count()
         args.batch_size = self.args.batch_size
-        train_dataset = get_wds_dataset(args=self.args, preprocess_img=self.train_image_processor,
+        train_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.train_image_processor,
                                                        is_train=True, tokenizer=self.tokenizer, return_dataset=True)
         train_dataloader = DataLoader(train_dataset, batch_size=args.world_size,#webdataset pipeline already handling batch size
                                       collate_fn=self.clip_batch_collator, num_workers=num_proc//2)
-
-        val_dataset = get_wds_dataset(args=self.args, preprocess_img=self.val_image_processor,
+        self.args.train_num_batches = num_batches
+        val_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.val_image_processor,
                                                      is_train=False, tokenizer=self.tokenizer, return_dataset=True)
 
         val_dataloader = DataLoader(val_dataset, batch_size=args.world_size,
                                     collate_fn=self.clip_batch_collator, num_workers=num_proc//2)
-
+        self.args.val_num_batches = num_batches
         '''
         train_dataset = wds.WebDataset(train_shards).decode('pil')
         train_dataloader = wds.WebLoader(train_dataset, batch_size=global_batch_size,
@@ -180,15 +183,12 @@ class PreTrainer:
 
 
         progress_bar = tqdm(range(init_step, self.args.total_steps))
-        self.train_dataloader = iter(self.train_dataloader)
+        self.train_dataloader = iter(cycle(self.train_dataloader))
 
         for current_iter in range(init_step, self.args.total_steps):
-            try:
-                batch = next(self.train_dataloader)
-            except:
-                self.train_dataloader = iter(self.train_dataloader)
-                batch = next(self.train_dataloader)
-                warnings.warn('StopIteration encountered. Restart train_dataloader.')
+
+            batch = next(self.train_dataloader)
+
 
 
             with self.accelerator.accumulate(self.model):
