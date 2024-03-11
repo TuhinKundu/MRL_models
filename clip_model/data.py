@@ -429,7 +429,7 @@ def get_wds_dataset(args, preprocess_img, is_train, epoch=0, floor=False, tokeni
         num_batches = math.ceil(num_samples / args.batch_size)
 
     if return_dataset:
-        return dataset
+        return dataset, num_batches
     dataloader = wds.WebLoader(
         dataset,
         batch_size=None,

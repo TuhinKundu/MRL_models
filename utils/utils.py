@@ -1,4 +1,5 @@
 import warnings
+from torch.utils.data import IterableDataset
 
 
 def check_batch_params(args, num_devices):
@@ -24,7 +25,7 @@ def check_iter_params(args, trainloader):
         if args.mlm:
             args.total_steps = len(trainloader) * args.epochs
         elif args.clip:
-            args.total_steps = trainloader.dataset.nsamples * args.epochs
+            args.total_steps = args.train_num_batches * args.epochs
             warnings.warn(f'total steps {args.total_steps} as trainloader is IterableDataset with no len')
     return args
 

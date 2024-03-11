@@ -49,3 +49,4 @@ github repository.You can also pass any custom model config supported by `open_c
 it will overwrite the `global_batch_size` or `batch_size` parameters you pass as arguments. 
 In CLIP, we use OpenCLIP's dataloading strategy hence you **need** to pass either `global_batch_size` or `batch_size` parameters
 as the dataloader will ignore deepspeed parameters. Please use default `auto` parameter in deepspeed config for CLIP.
+3. Codebase hasn't been battle-tested for multi-node distributed training. Accelerate and deepspeed offer support so changes should be minimal.
