@@ -74,7 +74,7 @@ class PreTrainer:
         self.grad_acc_steps = self.accelerator.deepspeed_config['gradient_accumulation_steps']
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
-                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}_{time.time()}')
+                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}')
 
     def clip_batch_collator(self,batch):
 
@@ -172,9 +172,8 @@ class PreTrainer:
 
             self.args.__dict__ = args
             wandb_config = {'learning_rate': self.args.lr}
-            wandb_run = wandb.init(project=self.experiment_name, resume=True,
+            wandb_run = wandb.init(project=self.args.experiment_name, resume=True,
                                    config=wandb_config)
-            self.args.wandb_runid = wandb.run.id
             init_step = args['iters']
         else:
             with open(f'{out_dir}/args.json', 'w') as f:
@@ -184,7 +183,7 @@ class PreTrainer:
             wandb_config = {'learning_rate': self.args.lr}
             wandb_run = wandb.init(project=self.experiment_name,
                                    config=wandb_config)
-            self.args.wandb_runid = wandb.run.id
+            self.args.experiment_name = self.experiment_name
             init_step = 0
 
 
@@ -255,12 +254,16 @@ class PreTrainer:
                     #unwrap_model = self.accelerator.unwrap_model(self.model)
                     #unwrap_model.save_pretrained(weight_dir, save_function = self.accelerator.save)
 
-                    self.accelerator.save_state(out_dir)
+                # deepspeed x accelerate bug for saving weights,should be called across all processes
+                # https://github.com/huggingface/diffusers/issues/2606#issuecomment-1463193509
+                self.accelerator.save_state(out_dir)
 
+                if self.accelerator.is_main_process:
                     self.args.lr = self.optimizer.param_groups[0]['lr']
-                    #artifact = wandb.Artifact(name=self.experiment_name, type='model')
-                    #artifact.add_dir(out_dir)
-                    #wandb_run.log_artifact(artifact)
+
+                    artifact = wandb.Artifact(name=self.experiment_name, type='model')
+                    artifact.add_dir(out_dir)
+                    wandb_run.log_artifact(artifact)
 
                     with open(f'{out_dir}/args.json', 'w') as f:
                         json.dump(self.args.__dict__, f)
@@ -279,9 +282,9 @@ class PreTrainer:
         if self.args.kube_pvc:
             os.system(f'rsync -avP {out_dir} {self.args.kube_pvc}')
 
-        #artifact = wandb.Artifact(name=self.experiment_name, type='model')
-        #artifact.add_dir(out_dir)
-        #wandb_run.log_artifact(artifact)
+        artifact = wandb.Artifact(name=self.experiment_name, type='model')
+        artifact.add_dir(out_dir)
+        wandb_run.log_artifact(artifact)
 
 
 
