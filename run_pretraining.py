@@ -29,6 +29,9 @@ from clip_model.data import *
 import MRL
 from utils import utils
 from itertools import cycle
+import time
+from datetime import timedelta
+from accelerate import InitProcessGroupKwargs
 
 
 class PreTrainer:
@@ -44,7 +47,9 @@ class PreTrainer:
             else:
                 self.loss_fn = MRL.MatryoshkaClipLoss(nesting_dim=self.args.nesting_dim, loss_weights=self.args.loss_weights)
 
-        self.accelerator = accelerate.Accelerator(split_batches=True) # change grad acc and precision (mixed/bf16) in deepspeed config
+        # to solve NCCL timeout issue and increase timeout limit: from https://github.com/huggingface/accelerate/issues/314#issuecomment-1785782762
+        process_group_kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=7200))
+        self.accelerator = accelerate.Accelerator(split_batches=True, kwargs_handlers=[process_group_kwargs]) # change grad acc and precision (mixed/bf16) in deepspeed config
 
         num_devices = self.accelerator.num_processes
         self.args = utils.check_batch_params(self.args, num_devices)
@@ -69,7 +74,7 @@ class PreTrainer:
         self.grad_acc_steps = self.accelerator.deepspeed_config['gradient_accumulation_steps']
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
-                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}')
+                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}_{time.time()}')
 
     def clip_batch_collator(self,batch):
 
@@ -167,7 +172,7 @@ class PreTrainer:
 
             self.args.__dict__ = args
             wandb_config = {'learning_rate': self.args.lr}
-            wandb_run = wandb.init(project=self.experiment_name,
+            wandb_run = wandb.init(project=self.experiment_name, resume=True,
                                    config=wandb_config)
             self.args.wandb_runid = wandb.run.id
             init_step = args['iters']
@@ -262,6 +267,9 @@ class PreTrainer:
 
                     if self.args.kube_pvc:
                         os.system(f'rsync -avP {out_dir} {self.args.kube_pvc}')
+
+                # processes with rank>0 move to next iteration and wait for rank=0 causing NCCL timeout issue
+                self.accelerator.wait_for_everyone()
 
 
         self.accelerator.save_state(out_dir)
