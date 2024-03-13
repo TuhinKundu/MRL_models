@@ -119,13 +119,13 @@ class PreTrainer:
         train_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.train_image_processor,
                                                        is_train=True, tokenizer=self.tokenizer, return_dataset=True)
         train_dataloader = DataLoader(train_dataset, batch_size=args.world_size,#webdataset pipeline already handling batch size
-                                      collate_fn=self.clip_batch_collator, num_workers=num_proc//2)
+                                      collate_fn=self.clip_batch_collator)
         self.args.train_num_batches = num_batches
         val_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.val_image_processor,
                                                      is_train=False, tokenizer=self.tokenizer, return_dataset=True)
 
         val_dataloader = DataLoader(val_dataset, batch_size=args.world_size,
-                                    collate_fn=self.clip_batch_collator, num_workers=num_proc//2)
+                                    collate_fn=self.clip_batch_collator) #num_workers causes possible bug https://github.com/pytorch/pytorch/issues/4507#issuecomment-1112095166
         self.args.val_num_batches = num_batches
         '''
         train_dataset = wds.WebDataset(train_shards).decode('pil')
@@ -330,7 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--kube_pvc', type=str, default=None, help='path for k8s pvc for permanent storage')
     parser.add_argument('--gradient_accumulation_steps', type=int, default=None, help='gradient accumulation steps')
-    parser.add_argument('--num_gpus', type=int, default=None, help='number of gpus')
+    #parser.add_argument('--num_gpus', type=int, default=None, help='number of gpus')
     args = parser.parse_args()
 
 
