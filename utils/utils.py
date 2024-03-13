@@ -33,3 +33,8 @@ def check_train_selection(args):
     if not (args.mlm or args.clip):
         raise AssertionError('set either mlm or clip argument')
 
+def check_grad_acc_steps(args, accelerator):
+    if args.gradient_accumulation_steps:
+        accelerator.deepspeed_config['gradient_accumulation_steps'] = args.gradient_accumulation_steps
+    return args
+

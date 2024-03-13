@@ -51,8 +51,9 @@ class PreTrainer:
         process_group_kwargs = InitProcessGroupKwargs(timeout=timedelta(seconds=7200))
         self.accelerator = accelerate.Accelerator(split_batches=True, kwargs_handlers=[process_group_kwargs]) # change grad acc and precision (mixed/bf16) in deepspeed config
 
-        num_devices = self.accelerator.num_processes
-        self.args = utils.check_batch_params(self.args, num_devices)
+
+        self.args = utils.check_batch_params(self.args, self.accelerator.num_processes)
+
 
         if self.args.mlm:
             self.train_dataloader, self.val_dataloader = self.load_data_for_mlm(self.args.data_path, self.args.global_batch_size, self.args.num_proc)
@@ -71,10 +72,10 @@ class PreTrainer:
         )
 
         self.dtype = self.model.get_data_types()[0]
-        self.grad_acc_steps = self.accelerator.deepspeed_config['gradient_accumulation_steps']
+        self.args = utils.check_grad_acc_steps(self.args, self.accelerator)
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
-                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.grad_acc_steps}')
+                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.accelerator.deepspeed_config["gradient_accumulation_steps"]}')
 
     def clip_batch_collator(self,batch):
 
@@ -328,6 +329,8 @@ if __name__ == '__main__':
     parser.add_argument('--wandb_key', type=str, default=None, help='wandb api login key for remote login')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--kube_pvc', type=str, default=None, help='path for k8s pvc for permanent storage')
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=None, help='gradient accumulation steps')
+    parser.add_argument('--num_gpus', type=int, default=None, help='number of gpus')
     args = parser.parse_args()
 
 
