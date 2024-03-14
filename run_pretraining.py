@@ -32,6 +32,7 @@ from itertools import cycle
 import time
 from datetime import timedelta
 from accelerate import InitProcessGroupKwargs
+from datasets import IterableDataset
 
 
 class PreTrainer:
@@ -84,12 +85,8 @@ class PreTrainer:
             image_batch.append(sample[0])
             text_batch.append(sample[1])
 
-        image_tensors = torch.stack(image_batch)
-        global_batch, batch, C, H, W = image_tensors.size()
-        image_tensors = image_tensors.view(global_batch*batch, C, H, W)
-        tokenized_tensors = torch.stack(text_batch)
-        global_batch, batch, seq_len = tokenized_tensors.size()
-        tokenized_tensors = tokenized_tensors.view(global_batch*batch, seq_len)
+        image_tensors = torch.cat(image_batch, dim=0)
+        tokenized_tensors = torch.cat(text_batch, dim=0)
 
         image_tensors = image_tensors.to(self.dtype)
         output_dict = {
@@ -103,7 +100,7 @@ class PreTrainer:
         location_shards = [location + shard for shard in location_shards]
         num_files = len(location_shards)
         num_shards = num_files//3 #for each shard there are three files, tar, json, parquet. json is used to compute n_samples
-        split_location = (num_shards//40)*3 #taking 2.5% shards for eval
+        split_location = (num_shards//100)*3 #taking 1% shards for validation
         if split_location == 0:
             split_location = 3
         location_shards.sort()
@@ -119,13 +116,13 @@ class PreTrainer:
         train_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.train_image_processor,
                                                        is_train=True, tokenizer=self.tokenizer, return_dataset=True)
         train_dataloader = DataLoader(train_dataset, batch_size=args.world_size,#webdataset pipeline already handling batch size
-                                      collate_fn=self.clip_batch_collator)
+                                      collate_fn=self.clip_batch_collator, num_workers=0)
         self.args.train_num_batches = num_batches
         val_dataset, num_batches = get_wds_dataset(args=self.args, preprocess_img=self.val_image_processor,
                                                      is_train=False, tokenizer=self.tokenizer, return_dataset=True)
 
         val_dataloader = DataLoader(val_dataset, batch_size=args.world_size,
-                                    collate_fn=self.clip_batch_collator) #num_workers causes possible bug https://github.com/pytorch/pytorch/issues/4507#issuecomment-1112095166
+                                    collate_fn=self.clip_batch_collator, num_workers=0) #num_workers causes possible bug https://github.com/pytorch/pytorch/issues/4507#issuecomment-1112095166
         self.args.val_num_batches = num_batches
         '''
         train_dataset = wds.WebDataset(train_shards).decode('pil')
