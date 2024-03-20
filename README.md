@@ -27,7 +27,7 @@ HF Transformers and Open CLIP libraries.
 
     accelerate launch --config_file bert/default_config.yaml run_pretraining.py --batch_size 2 --mrl yes --clip n --mlm y  --data_path ../bookcorpus_train/ --output_path output_dir/ --model_name bert-base-uncased --total_steps 1000000
 
-##### Open_Clip pretraining
+#### Open_Clip pretraining
 
 Open CLIP pretraining has been integrated here with HF Accelerate (with deepspeed integration)
 pipeline to support both HF and Open CLIP models with deepspeed zero1/2 stage training paradigm.
@@ -39,6 +39,13 @@ less than an hour to download.
 Example command to run clip pretraining
 
     accelerate launch --config_file clip_model/default_config.yaml run_pretraining.py --batch_size 8 --mrl yes --clip yes --data_path clip/cc3m/ --output_path output_dir/ --model_name ViT-B-32 --epochs 32
+
+
+#### MLM finetuning
+
+Example command to run glue evaluations
+
+    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 8 --learning_rate 2e-5 --num_train_epochs 3 --output_dir bert/tmp/ --pretrained_weights ../models_pretrained/bert-base-uncased_mrlFalse_bs128_lr1.0E-04_warmup10000_gradacc2/pytorch_model/mp_rank_00_model_states.pt --task_name mrpc --max_length 128
 
 Miscellaneous
 
