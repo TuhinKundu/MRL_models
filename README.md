@@ -15,7 +15,7 @@ Codebase developed with
     deepspeed==0.13.2
     accelerate==0.27.2
     open_clip_torch==2.24.0
-    wandb
+    wandb==0.16.3
 
 Please configure HF Accelerate library by running `accelerate config` to utilize appropriate hardware. In the following 
 questions asked, select deepspeed with appropriate hardware configuration and provide pathname for the deepspeed 
@@ -45,8 +45,17 @@ Example command to run clip pretraining
 
 Example command to run glue evaluations
 
-    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 8 --learning_rate 2e-5 --num_train_epochs 3 --output_dir bert/tmp/ --pretrained_weights ../models_pretrained/bert-base-uncased_mrlFalse_bs128_lr1.0E-04_warmup10000_gradacc2/pytorch_model/mp_rank_00_model_states.pt --task_name mrpc --max_length 128
+Note: Huggingface script bert/run_glue_no_trainer.py handles gradient accumulation steps, change it as an argument and not in bert/bert_ds_config.yaml - keep it as 1. 
 
+Also `per_gpu_train_batch_size` is [total batch size](https://github.com/huggingface/transformers/issues/26548), per gpu would be divided by `num_processes` in accelerate config.
+
+    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 16 --learning_rate 2e-5 --num_train_epochs 5 --output_dir bert/tmp/ --pretrained_weights models_pretrained/bert-base-uncased_mrlFalse_bs128_lr1.0E-04_warmup10000_gradacc2/pytorch_model/mp_rank_00_model_states.pt  --max_length 128 --task_name stsb
+
+To test using released model weights, remove `pretrained_weights` argument.
+
+    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 16 --learning_rate 2e-5 --num_train_epochs 5 --output_dir bert/tmp/  --max_length 128 --task_name stsb
+
+    
 Miscellaneous
 
 1. Check model name with `open_clip.list_models()` to pass argument for `model_name`. 

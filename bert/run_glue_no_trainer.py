@@ -38,7 +38,6 @@ from tqdm.auto import tqdm
 import transformers
 from transformers import (
     AutoConfig,
-    AutoModelForSequenceClassification,
     AutoTokenizer,
     DataCollatorWithPadding,
     PretrainedConfig,
@@ -48,7 +47,7 @@ from transformers import (
 )
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-
+from modeling_bert import BertForSequenceClassification
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.37.0")
@@ -57,17 +56,16 @@ logger = get_logger(__name__)
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 
-task_to_keys = {
-    "cola": ("sentence", None),
-    "mnli": ("premise", "hypothesis"),
-    "mrpc": ("sentence1", "sentence2"),
-    "qnli": ("question", "sentence"),
-    "qqp": ("question1", "question2"),
-    "rte": ("sentence1", "sentence2"),
-    "sst2": ("sentence", None),
-    "stsb": ("sentence1", "sentence2"),
-    "wnli": ("sentence1", "sentence2"),
-}
+
+def str2bool(flag):
+    if isinstance(flag, bool):
+        return flag
+    elif flag.lower() in ['yes', 'true', 't', 'y', '1']:
+        return True
+    elif flag.lower() in ['no', 'false', 'f', 'n', '0']:
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean answer expected.')
 
 
 def parse_args():
@@ -96,7 +94,8 @@ def parse_args():
     )
     parser.add_argument(
         "--pad_to_max_length",
-        action="store_true",
+        type=str2bool,
+        default=True,
         help="If passed, pad all samples to `max_length`. Otherwise, dynamic padding is used.",
     )
     parser.add_argument(
@@ -108,7 +107,8 @@ def parse_args():
 
     parser.add_argument(
         "--use_slow_tokenizer",
-        action="store_true",
+        type=str2bool,
+        default=False,
         help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library).",
     )
     parser.add_argument(
@@ -120,7 +120,7 @@ def parse_args():
     parser.add_argument(
         "--per_device_eval_batch_size",
         type=int,
-        default=8,
+        default=16,
         help="Batch size (per device) for the evaluation dataloader.",
     )
     parser.add_argument(
@@ -155,7 +155,7 @@ def parse_args():
     )
     parser.add_argument("--output_dir", type=str, default=None, help="Where to store the final model.")
     parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
-    parser.add_argument("--push_to_hub", action="store_true", help="Whether or not to push the model to the Hub.")
+    parser.add_argument("--push_to_hub", type=str2bool, default=False, help="Whether or not to push the model to the Hub.")
     parser.add_argument(
         "--hub_model_id", type=str, help="The name of the repository to keep in sync with the local `output_dir`."
     )
@@ -185,7 +185,8 @@ def parse_args():
     )
     parser.add_argument(
         "--with_tracking",
-        action="store_true",
+        type=str2bool,
+        default=False,
         help="Whether to enable experiment trackers for logging.",
     )
     parser.add_argument(
@@ -200,7 +201,8 @@ def parse_args():
     )
     parser.add_argument(
         "--ignore_mismatched_sizes",
-        action="store_true",
+        type=str2bool,
+        default=False,
         help="Whether or not to enable to load a pretrained model whose head dimensions are different.",
     )
     args = parser.parse_args()
@@ -222,8 +224,10 @@ def parse_args():
     return args
 
 
-def main():
-    args = parse_args()
+def main(args):
+    tmp = args.output_dir
+    args.output_dir = os.path.join(args.output_dir, args.task_name)
+
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
     send_example_telemetry("run_glue_no_trainer", args)
@@ -287,7 +291,7 @@ def main():
     # download the dataset.
     if args.task_name is not None:
         # Downloading and loading a dataset from the hub.
-        raw_datasets = load_dataset("glue", args.task_name, streaming=True)
+        raw_datasets = load_dataset("glue", args.task_name)
 
     else:
         # Loading the dataset from local csv or json file.
@@ -297,7 +301,7 @@ def main():
         if args.validation_file is not None:
             data_files["validation"] = args.validation_file
         extension = (args.train_file if args.train_file is not None else args.validation_file).split(".")[-1]
-        raw_datasets = load_dataset(extension, data_files=data_files)
+        raw_datasets = load_dataset(extension, args.task_name, data_files=data_files)
     # See more about loading any type of standard or custom dataset at
     # https://huggingface.co/docs/datasets/loading_datasets.
 
@@ -334,17 +338,20 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path, use_fast=not args.use_slow_tokenizer, trust_remote_code=args.trust_remote_code
     )
-    model = AutoModelForSequenceClassification.from_pretrained(
+    model = BertForSequenceClassification.from_pretrained(
         args.model_name_or_path,
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
         ignore_mismatched_sizes=args.ignore_mismatched_sizes,
         trust_remote_code=args.trust_remote_code,
     )
-    pretrained_weights = torch.load(args.pretrained_weights)
-    msg = model.load_state_dict(pretrained_weights['module'], strict=False)
-    print(msg)
-
+    if args.pretrained_weights:
+        pretrained_weights = torch.load(args.pretrained_weights)
+        #pretrained_weights['module']['bert.pooler.dense.weight'] = pretrained_weights['module']['cls.predictions.transform.dense.weight']
+        #pretrained_weights['module']['bert.pooler.dense.bias'] = pretrained_weights['module']['cls.predictions.transform.dense.bias']
+        msg = model.load_state_dict(pretrained_weights['module'], strict=False)
+        print('message:', msg)
+    #exit()
     # Preprocessing the datasets
     if args.task_name is not None:
         sentence1_key, sentence2_key = task_to_keys[args.task_name]
@@ -410,26 +417,28 @@ def main():
 
         return result
 
+    '''
     with accelerator.main_process_first():
 
         processed_datasets = raw_datasets.map(
             preprocess_function,
-            batched=True,
+
             remove_columns=raw_datasets["train"].column_names,
+            batch_size=args.per_device_train_batch_size
             #desc="Running tokenizer on dataset",
         )
+    '''
+    with accelerator.main_process_first():
+        processed_datasets = raw_datasets.map(preprocess_function)
+        processed_datasets = processed_datasets.remove_columns(raw_datasets['train'].column_names)
 
+        train_dataset = processed_datasets["train"]
 
-
-    train_dataset = processed_datasets["train"]
-
-    eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
-
-
+        eval_dataset = processed_datasets["validation_matched" if args.task_name == "mnli" else "validation"]
 
     # Log a few random samples from the training set:
 
-    #for index in random.sample(range(train_dataset.dataset_size), 3):
+    #for index in random.sample(range(train_dataset.num_rows), 3):
     #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # DataLoaders creation:
@@ -443,11 +452,10 @@ def main():
         # of 8s, which will enable the use of Tensor Cores on NVIDIA hardware with compute capability >= 7.5 (Volta).
         data_collator = DataCollatorWithPadding(tokenizer, pad_to_multiple_of=(8 if accelerator.use_fp16 else None))
 
-
     train_dataloader = DataLoader(
-        train_dataset, collate_fn=data_collator, batch_size=args.per_device_train_batch_size
+        train_dataset, collate_fn=data_collator, batch_size=args.per_device_train_batch_size*accelerator.num_processes
     )
-    eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.per_device_eval_batch_size)
+    eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.per_device_eval_batch_size*accelerator.num_processes)
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
@@ -466,9 +474,10 @@ def main():
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    len_trainloader = train_dataset.dataset_size/(args.per_device_train_batch_size*accelerator.num_processes)
-    len_evalloader = eval_dataset.dataset_size/(args.per_device_train_batch_size*accelerator.num_processes)
+    len_trainloader = train_dataset.num_rows//(args.per_device_train_batch_size*accelerator.num_processes)
+    len_evalloader = eval_dataset.num_rows//(args.per_device_train_batch_size*accelerator.num_processes)
     num_update_steps_per_epoch = math.ceil(len_trainloader/args.gradient_accumulation_steps)#math.ceil(train_dataloader. / args.gradient_accumulation_steps)
+
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -480,10 +489,13 @@ def main():
         num_training_steps=args.max_train_steps,
     )
 
+
     # Prepare everything with our `accelerator`.
-    model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator.prepare(
+    model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator._prepare_deepspeed(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
     )
+
+
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed
     num_update_steps_per_epoch = math.ceil(len_trainloader / args.gradient_accumulation_steps)
@@ -491,7 +503,6 @@ def main():
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
-
     # Figure out how many steps we should save the Accelerator states
     checkpointing_steps = args.checkpointing_steps
     if checkpointing_steps is not None and checkpointing_steps.isdigit():
@@ -515,7 +526,7 @@ def main():
     total_batch_size = args.per_device_train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {train_dataset.dataset_size}")
+    logger.info(f"  Num examples = {train_dataset.num_rows}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
@@ -557,7 +568,8 @@ def main():
     # update the progress_bar if load from checkpoint
     progress_bar.update(completed_steps)
     dtype = model.get_data_types()[0]
-    for epoch in range(0, 30000):
+
+    for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
         if args.with_tracking:
             total_loss = 0
@@ -598,11 +610,16 @@ def main():
 
         model.eval()
         samples_seen = 0
+        eval_progress_bar = tqdm(range(len_evalloader), disable=not accelerator.is_local_main_process)
+
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
                 outputs = model(**batch)
+
             predictions = outputs.logits.argmax(dim=-1) if not is_regression else outputs.logits.squeeze()
+            #print('is regression', is_regression)
             predictions, references = accelerator.gather((predictions, batch["labels"]))
+            #print(predictions, references)
             # If we are in a multiprocess environment, the last batch has duplicates
             if accelerator.num_processes > 1:
                 if step == len_evalloader - 1:
@@ -611,12 +628,13 @@ def main():
                 else:
                     samples_seen += references.shape[0]
             metric.add_batch(
-                predictions=predictions.to(torch.float32),
+                predictions=predictions,
                 references=references,
             )
+            eval_progress_bar.update(1)
 
         eval_metric = metric.compute()
-        logger.info(f"epoch {epoch}: {eval_metric}")
+        logger.info(f"Task:{args.task_name} epoch {epoch}: {eval_metric}")
 
         if args.with_tracking:
             accelerator.log(
@@ -632,6 +650,7 @@ def main():
         if args.push_to_hub and epoch < args.num_train_epochs - 1:
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
+
             unwrapped_model.save_pretrained(
                 args.output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save
             )
@@ -653,6 +672,7 @@ def main():
     if args.output_dir is not None:
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
+
         unwrapped_model.save_pretrained(
             args.output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save
         )
@@ -685,7 +705,28 @@ def main():
         all_results = {f"eval_{k}": v for k, v in eval_metric.items()}
         with open(os.path.join(args.output_dir, "all_results.json"), "w") as f:
             json.dump(all_results, f)
+        all_results['task'] = args.task_name
+        args.output_dir = tmp
+        return all_results
+    else:
+        args.output_dir = tmp
+        return eval_metric
 
 
 if __name__ == "__main__":
-    main()
+
+    task_to_keys = {
+        "cola": ("sentence", None),
+        "mnli": ("premise", "hypothesis"),
+        "mrpc": ("sentence1", "sentence2"),
+        "qnli": ("question", "sentence"),
+        "qqp": ("question1", "question2"),
+        "rte": ("sentence1", "sentence2"),
+        "sst2": ("sentence", None),
+        "stsb": ("sentence1", "sentence2"),
+        "wnli": ("sentence1", "sentence2"),
+    }
+
+    args = parse_args()
+
+    print(main(args))
