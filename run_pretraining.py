@@ -74,9 +74,14 @@ class PreTrainer:
 
         self.dtype = self.model.get_data_types()[0]
         self.args = utils.check_grad_acc_steps(self.args, self.accelerator)
+        self.bf16 = self.accelerator.deepspeed_config['bf16']['enabled']
+
 
         self.experiment_name = (f'{self.args.model_name.split("/")[-1]}_mrl{self.args.mrl}_'
-                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_warmup{self.args.warmup_steps}_gradacc{self.accelerator.deepspeed_config["gradient_accumulation_steps"]}')
+                                f'bs{self.args.global_batch_size}_lr{"%.1E"%Decimal(self.args.lr)}_'
+                                f'warmup{self.args.warmup_steps}_'
+                                f'gradacc{self.accelerator.deepspeed_config["gradient_accumulation_steps"]}_'
+                                f'bf16{self.bf16}')
 
     def clip_batch_collator(self,batch):
 
