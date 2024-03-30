@@ -1,0 +1,255 @@
+[2024-03-27 18:26:38,980] torch.distributed.run: [WARNING] 
+[2024-03-27 18:26:38,980] torch.distributed.run: [WARNING] *****************************************
+[2024-03-27 18:26:38,980] torch.distributed.run: [WARNING] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+[2024-03-27 18:26:38,980] torch.distributed.run: [WARNING] *****************************************
+usage: main.py [-h] [--train-data TRAIN_DATA]
+               [--train-data-upsampling-factors TRAIN_DATA_UPSAMPLING_FACTORS]
+               [--val-data VAL_DATA] [--train-num-samples TRAIN_NUM_SAMPLES]
+               [--val-num-samples VAL_NUM_SAMPLES]
+               [--dataset-type {webdataset,csv,synthetic,auto}]
+               [--dataset-resampled] [--csv-separator CSV_SEPARATOR]
+               [--csv-img-key CSV_IMG_KEY] [--csv-caption-key CSV_CAPTION_KEY]
+               [--imagenet-val IMAGENET_VAL] [--imagenet-v2 IMAGENET_V2]
+               [--logs LOGS] [--log-local] [--name NAME] [--workers WORKERS]
+               [--batch-size BATCH_SIZE] [--epochs EPOCHS]
+               [--epochs-cooldown EPOCHS_COOLDOWN] [--lr LR] [--beta1 BETA1]
+               [--beta2 BETA2] [--eps EPS] [--wd WD] [--warmup WARMUP]
+               [--use-bn-sync] [--skip-scheduler]
+               [--lr-scheduler LR_SCHEDULER]
+               [--lr-cooldown-end LR_COOLDOWN_END]
+               [--lr-cooldown-power LR_COOLDOWN_POWER]
+               [--save-frequency SAVE_FREQUENCY] [--save-most-recent]
+               [--zeroshot-frequency ZEROSHOT_FREQUENCY]
+               [--val-frequency VAL_FREQUENCY] [--resume RESUME]
+               [--precision {amp,amp_bf16,amp_bfloat16,bf16,fp16,fp32}]
+               [--model MODEL] [--pretrained PRETRAINED] [--pretrained-image]
+               [--lock-image]
+               [--lock-image-unlocked-groups LOCK_IMAGE_UNLOCKED_GROUPS]
+               [--lock-image-freeze-bn-stats] [--image-mean MEAN [MEAN ...]]
+               [--image-std STD [STD ...]] [--aug-cfg [AUG_CFG ...]]
+               [--grad-checkpointing] [--local-loss] [--gather-with-grad]
+               [--force-image-size FORCE_IMAGE_SIZE [FORCE_IMAGE_SIZE ...]]
+               [--force-quick-gelu]
+               [--force-patch-dropout FORCE_PATCH_DROPOUT]
+               [--force-custom-text] [--torchscript] [--trace]
+               [--accum-freq ACCUM_FREQ] [--dist-url DIST_URL]
+               [--dist-backend DIST_BACKEND] [--report-to REPORT_TO]
+               [--wandb-notes WANDB_NOTES]
+               [--wandb-project-name WANDB_PROJECT_NAME] [--debug]
+               [--copy-codebase] [--horovod] [--ddp-static-graph]
+               [--no-set-device-rank] [--seed SEED]
+               [--grad-clip-norm GRAD_CLIP_NORM] [--lock-text]
+               [--lock-text-unlocked-layers LOCK_TEXT_UNLOCKED_LAYERS]
+               [--lock-text-freeze-layer-norm]
+               [--log-every-n-steps LOG_EVERY_N_STEPS]
+               [--coca-caption-loss-weight COCA_CAPTION_LOSS_WEIGHT]
+               [--coca-contrastive-loss-weight COCA_CONTRASTIVE_LOSS_WEIGHT]
+               [--remote-sync REMOTE_SYNC]
+               [--remote-sync-frequency REMOTE_SYNC_FREQUENCY]
+               [--remote-sync-protocol {s3,fsspec}]
+               [--delete-previous-checkpoint] [--distill-model DISTILL_MODEL]
+               [--distill-pretrained DISTILL_PRETRAINED] [--force_mrl_loss]
+               [--mrl_loss_weights MRL_LOSS_WEIGHTS]
+               [--mrl_dim_to_consider MRL_DIM_TO_CONSIDER]
+main.py: error: unrecognized arguments:  
+usage: main.py [-h] [--train-data TRAIN_DATA]
+               [--train-data-upsampling-factors TRAIN_DATA_UPSAMPLING_FACTORS]
+               [--val-data VAL_DATA] [--train-num-samples TRAIN_NUM_SAMPLES]
+               [--val-num-samples VAL_NUM_SAMPLES]
+               [--dataset-type {webdataset,csv,synthetic,auto}]
+               [--dataset-resampled] [--csv-separator CSV_SEPARATOR]
+               [--csv-img-key CSV_IMG_KEY] [--csv-caption-key CSV_CAPTION_KEY]
+               [--imagenet-val IMAGENET_VAL] [--imagenet-v2 IMAGENET_V2]
+               [--logs LOGS] [--log-local] [--name NAME] [--workers WORKERS]
+               [--batch-size BATCH_SIZE] [--epochs EPOCHS]
+               [--epochs-cooldown EPOCHS_COOLDOWN] [--lr LR] [--beta1 BETA1]
+               [--beta2 BETA2] [--eps EPS] [--wd WD] [--warmup WARMUP]
+               [--use-bn-sync] [--skip-scheduler]
+               [--lr-scheduler LR_SCHEDULER]
+               [--lr-cooldown-end LR_COOLDOWN_END]
+               [--lr-cooldown-power LR_COOLDOWN_POWER]
+               [--save-frequency SAVE_FREQUENCY] [--save-most-recent]
+               [--zeroshot-frequency ZEROSHOT_FREQUENCY]
+               [--val-frequency VAL_FREQUENCY] [--resume RESUME]
+               [--precision {amp,amp_bf16,amp_bfloat16,bf16,fp16,fp32}]
+               [--model MODEL] [--pretrained PRETRAINED] [--pretrained-image]
+               [--lock-image]
+               [--lock-image-unlocked-groups LOCK_IMAGE_UNLOCKED_GROUPS]
+               [--lock-image-freeze-bn-stats] [--image-mean MEAN [MEAN ...]]
+               [--image-std STD [STD ...]] [--aug-cfg [AUG_CFG ...]]
+               [--grad-checkpointing] [--local-loss] [--gather-with-grad]
+               [--force-image-size FORCE_IMAGE_SIZE [FORCE_IMAGE_SIZE ...]]
+               [--force-quick-gelu]
+               [--force-patch-dropout FORCE_PATCH_DROPOUT]
+               [--force-custom-text] [--torchscript] [--trace]
+               [--accum-freq ACCUM_FREQ] [--dist-url DIST_URL]
+               [--dist-backend DIST_BACKEND] [--report-to REPORT_TO]
+               [--wandb-notes WANDB_NOTES]
+               [--wandb-project-name WANDB_PROJECT_NAME] [--debug]
+               [--copy-codebase] [--horovod] [--ddp-static-graph]
+               [--no-set-device-rank] [--seed SEED]
+               [--grad-clip-norm GRAD_CLIP_NORM] [--lock-text]
+               [--lock-text-unlocked-layers LOCK_TEXT_UNLOCKED_LAYERS]
+               [--lock-text-freeze-layer-norm]
+               [--log-every-n-steps LOG_EVERY_N_STEPS]
+               [--coca-caption-loss-weight COCA_CAPTION_LOSS_WEIGHT]
+               [--coca-contrastive-loss-weight COCA_CONTRASTIVE_LOSS_WEIGHT]
+               [--remote-sync REMOTE_SYNC]
+               [--remote-sync-frequency REMOTE_SYNC_FREQUENCY]
+               [--remote-sync-protocol {s3,fsspec}]
+               [--delete-previous-checkpoint] [--distill-model DISTILL_MODEL]
+               [--distill-pretrained DISTILL_PRETRAINED] [--force_mrl_loss]
+               [--mrl_loss_weights MRL_LOSS_WEIGHTS]
+               [--mrl_dim_to_consider MRL_DIM_TO_CONSIDER]
+main.py: error: unrecognized arguments:  
+usage: main.py [-h] [--train-data TRAIN_DATA]
+               [--train-data-upsampling-factors TRAIN_DATA_UPSAMPLING_FACTORS]
+               [--val-data VAL_DATA] [--train-num-samples TRAIN_NUM_SAMPLES]
+               [--val-num-samples VAL_NUM_SAMPLES]
+               [--dataset-type {webdataset,csv,synthetic,auto}]
+               [--dataset-resampled] [--csv-separator CSV_SEPARATOR]
+               [--csv-img-key CSV_IMG_KEY] [--csv-caption-key CSV_CAPTION_KEY]
+               [--imagenet-val IMAGENET_VAL] [--imagenet-v2 IMAGENET_V2]
+               [--logs LOGS] [--log-local] [--name NAME] [--workers WORKERS]
+               [--batch-size BATCH_SIZE] [--epochs EPOCHS]
+               [--epochs-cooldown EPOCHS_COOLDOWN] [--lr LR] [--beta1 BETA1]
+               [--beta2 BETA2] [--eps EPS] [--wd WD] [--warmup WARMUP]
+               [--use-bn-sync] [--skip-scheduler]
+               [--lr-scheduler LR_SCHEDULER]
+               [--lr-cooldown-end LR_COOLDOWN_END]
+               [--lr-cooldown-power LR_COOLDOWN_POWER]
+               [--save-frequency SAVE_FREQUENCY] [--save-most-recent]
+               [--zeroshot-frequency ZEROSHOT_FREQUENCY]
+               [--val-frequency VAL_FREQUENCY] [--resume RESUME]
+               [--precision {amp,amp_bf16,amp_bfloat16,bf16,fp16,fp32}]
+               [--model MODEL] [--pretrained PRETRAINED] [--pretrained-image]
+               [--lock-image]
+               [--lock-image-unlocked-groups LOCK_IMAGE_UNLOCKED_GROUPS]
+               [--lock-image-freeze-bn-stats] [--image-mean MEAN [MEAN ...]]
+               [--image-std STD [STD ...]] [--aug-cfg [AUG_CFG ...]]
+               [--grad-checkpointing] [--local-loss] [--gather-with-grad]
+               [--force-image-size FORCE_IMAGE_SIZE [FORCE_IMAGE_SIZE ...]]
+               [--force-quick-gelu]
+               [--force-patch-dropout FORCE_PATCH_DROPOUT]
+               [--force-custom-text] [--torchscript] [--trace]
+               [--accum-freq ACCUM_FREQ] [--dist-url DIST_URL]
+               [--dist-backend DIST_BACKEND] [--report-to REPORT_TO]
+               [--wandb-notes WANDB_NOTES]
+               [--wandb-project-name WANDB_PROJECT_NAME] [--debug]
+               [--copy-codebase] [--horovod] [--ddp-static-graph]
+               [--no-set-device-rank] [--seed SEED]
+               [--grad-clip-norm GRAD_CLIP_NORM] [--lock-text]
+               [--lock-text-unlocked-layers LOCK_TEXT_UNLOCKED_LAYERS]
+               [--lock-text-freeze-layer-norm]
+               [--log-every-n-steps LOG_EVERY_N_STEPS]
+               [--coca-caption-loss-weight COCA_CAPTION_LOSS_WEIGHT]
+               [--coca-contrastive-loss-weight COCA_CONTRASTIVE_LOSS_WEIGHT]
+               [--remote-sync REMOTE_SYNC]
+               [--remote-sync-frequency REMOTE_SYNC_FREQUENCY]
+               [--remote-sync-protocol {s3,fsspec}]
+               [--delete-previous-checkpoint] [--distill-model DISTILL_MODEL]
+               [--distill-pretrained DISTILL_PRETRAINED] [--force_mrl_loss]
+               [--mrl_loss_weights MRL_LOSS_WEIGHTS]
+               [--mrl_dim_to_consider MRL_DIM_TO_CONSIDER]
+main.py: error: unrecognized arguments:  
+usage: main.py [-h] [--train-data TRAIN_DATA]
+               [--train-data-upsampling-factors TRAIN_DATA_UPSAMPLING_FACTORS]
+               [--val-data VAL_DATA] [--train-num-samples TRAIN_NUM_SAMPLES]
+               [--val-num-samples VAL_NUM_SAMPLES]
+               [--dataset-type {webdataset,csv,synthetic,auto}]
+               [--dataset-resampled] [--csv-separator CSV_SEPARATOR]
+               [--csv-img-key CSV_IMG_KEY] [--csv-caption-key CSV_CAPTION_KEY]
+               [--imagenet-val IMAGENET_VAL] [--imagenet-v2 IMAGENET_V2]
+               [--logs LOGS] [--log-local] [--name NAME] [--workers WORKERS]
+               [--batch-size BATCH_SIZE] [--epochs EPOCHS]
+               [--epochs-cooldown EPOCHS_COOLDOWN] [--lr LR] [--beta1 BETA1]
+               [--beta2 BETA2] [--eps EPS] [--wd WD] [--warmup WARMUP]
+               [--use-bn-sync] [--skip-scheduler]
+               [--lr-scheduler LR_SCHEDULER]
+               [--lr-cooldown-end LR_COOLDOWN_END]
+               [--lr-cooldown-power LR_COOLDOWN_POWER]
+               [--save-frequency SAVE_FREQUENCY] [--save-most-recent]
+               [--zeroshot-frequency ZEROSHOT_FREQUENCY]
+               [--val-frequency VAL_FREQUENCY] [--resume RESUME]
+               [--precision {amp,amp_bf16,amp_bfloat16,bf16,fp16,fp32}]
+               [--model MODEL] [--pretrained PRETRAINED] [--pretrained-image]
+               [--lock-image]
+               [--lock-image-unlocked-groups LOCK_IMAGE_UNLOCKED_GROUPS]
+               [--lock-image-freeze-bn-stats] [--image-mean MEAN [MEAN ...]]
+               [--image-std STD [STD ...]] [--aug-cfg [AUG_CFG ...]]
+               [--grad-checkpointing] [--local-loss] [--gather-with-grad]
+               [--force-image-size FORCE_IMAGE_SIZE [FORCE_IMAGE_SIZE ...]]
+               [--force-quick-gelu]
+               [--force-patch-dropout FORCE_PATCH_DROPOUT]
+               [--force-custom-text] [--torchscript] [--trace]
+               [--accum-freq ACCUM_FREQ] [--dist-url DIST_URL]
+               [--dist-backend DIST_BACKEND] [--report-to REPORT_TO]
+               [--wandb-notes WANDB_NOTES]
+               [--wandb-project-name WANDB_PROJECT_NAME] [--debug]
+               [--copy-codebase] [--horovod] [--ddp-static-graph]
+               [--no-set-device-rank] [--seed SEED]
+               [--grad-clip-norm GRAD_CLIP_NORM] [--lock-text]
+               [--lock-text-unlocked-layers LOCK_TEXT_UNLOCKED_LAYERS]
+               [--lock-text-freeze-layer-norm]
+               [--log-every-n-steps LOG_EVERY_N_STEPS]
+               [--coca-caption-loss-weight COCA_CAPTION_LOSS_WEIGHT]
+               [--coca-contrastive-loss-weight COCA_CONTRASTIVE_LOSS_WEIGHT]
+               [--remote-sync REMOTE_SYNC]
+               [--remote-sync-frequency REMOTE_SYNC_FREQUENCY]
+               [--remote-sync-protocol {s3,fsspec}]
+               [--delete-previous-checkpoint] [--distill-model DISTILL_MODEL]
+               [--distill-pretrained DISTILL_PRETRAINED] [--force_mrl_loss]
+               [--mrl_loss_weights MRL_LOSS_WEIGHTS]
+               [--mrl_dim_to_consider MRL_DIM_TO_CONSIDER]
+main.py: error: unrecognized arguments:  
+[2024-03-27 18:26:59,163] torch.distributed.elastic.multiprocessing.api: [ERROR] failed (exitcode: 2) local_rank: 0 (pid: 45447) of binary: /gscratch/krishna/arnabk1/pyclip/bin/python
+Traceback (most recent call last):
+  File "/gscratch/krishna/arnabk1/pyclip/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/gscratch/krishna/arnabk1/pyclip/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 347, in wrapper
+    return f(*args, **kwargs)
+  File "/gscratch/krishna/arnabk1/pyclip/lib/python3.10/site-packages/torch/distributed/run.py", line 812, in main
+    run(args)
+  File "/gscratch/krishna/arnabk1/pyclip/lib/python3.10/site-packages/torch/distributed/run.py", line 803, in run
+    elastic_launch(
+  File "/gscratch/krishna/arnabk1/pyclip/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 135, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/gscratch/krishna/arnabk1/pyclip/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 268, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+training.main FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2024-03-27_18:26:59
+  host      : g3066.hyak.local
+  rank      : 1 (local_rank: 1)
+  exitcode  : 2 (pid: 45448)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[2]:
+  time      : 2024-03-27_18:26:59
+  host      : g3066.hyak.local
+  rank      : 2 (local_rank: 2)
+  exitcode  : 2 (pid: 45449)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[3]:
+  time      : 2024-03-27_18:26:59
+  host      : g3066.hyak.local
+  rank      : 3 (local_rank: 3)
+  exitcode  : 2 (pid: 45450)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2024-03-27_18:26:59
+  host      : g3066.hyak.local
+  rank      : 0 (local_rank: 0)
+  exitcode  : 2 (pid: 45447)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
+finetuning_original.sh: line 14: --accum-freq: command not found

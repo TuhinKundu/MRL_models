@@ -1,0 +1,25 @@
+cd /mmfs1/gscratch/krishna/mayank/clip_clone/open_clip/src
+torchrun --nproc_per_node 2 --master_port 4534 -m training.main \
+    --model "ViT-B-32" \
+    --pretrained "laion400m_e32" \
+    --train-data "/mmfs1/data/yfcc-tmp/cc_3m/train_shards/shard_{000000..003318}.tar" \
+    --imagenet-val "/mmfs1/data/yfcc-tmp/imagenet/val/" \
+    --dataset-type webdataset \
+    --precision amp \
+    --gather-with-grad \
+    --local-loss \
+    --force_mrl_loss \
+    --mrl_loss_weights "0.3,0.25,0.2,0.15,0.1" \
+    --mrl_dim_to_consider "768,384,192,96,48" \
+    --accum-freq 1 \
+    --batch-size 512 \
+    --lr 1e-07 \
+    --workers 4 \
+    --epochs 10 \
+    --warmup 500 \
+    --zeroshot-frequency 1 \
+    --seed 0 \
+    --report-to 'wandb' \
+    --wandb-project-name "mrl_clip_training" \
+    --logs "/mmfs1/gscratch/krishna/mayank/clip_clone/open_clip/src/logs/mrl_clip" \
+    --name "ViT-B-16_liaon400m_e32_finetune_mrl_ep10_warmup_500_wl030250201501_lr1e-07" 
