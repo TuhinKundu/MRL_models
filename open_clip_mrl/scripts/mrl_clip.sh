@@ -1,4 +1,4 @@
-cd /mmfs1/gscratch/krishna/arnabk1/mayank_clip_mrl/src
+cd /mmfs1/gscratch/krishna/arnabk1/open_clip_mrl/src
 torchrun --nproc_per_node 4 --master_port 4321 -m training.main \
     --model "ViT-B-16" \
     --train-data "/gscratch/krishna/chenhaoz/IL/FDT/data/cc3m/{00000..00331}.tar"\

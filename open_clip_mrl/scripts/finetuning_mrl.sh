@@ -1,4 +1,4 @@
-cd /mmfs1/gscratch/krishna/arnabk1/mayank_clip_mrl/src
+cd /mmfs1/gscratch/krishna/arnabk1/open_clip_mrl/src
 torchrun --nproc_per_node 4 --master_port 4329 -m training.main \
     --model "ViT-B-16" \
     --pretrained "laion400m_e32" \
