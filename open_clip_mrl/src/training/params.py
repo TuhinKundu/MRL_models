@@ -447,6 +447,7 @@ def parse_args(args):
         type=parse_dim_to_consider, 
         help="weights for loss weights, dimensions are considered in following order 8, 16, 32, 64, 128, 256, 512, 768"
     )
+    parser.add_argument('--wandb_key', default=None, type=str, help="key to login to wandb")
     args = parser.parse_args(args)
 
     # If some params are not passed, we use the default values based on model name.
