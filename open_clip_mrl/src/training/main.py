@@ -75,8 +75,7 @@ def is_main_process(accelerator):
         return False
 def main(args):
     args = parse_args(args)
-    if args.wandb_key:
-        wandb.login(key=args.wandb_key)
+
 
 
     args.name = (f'{args.model}_mrl{args.force_mrl_loss}_'
@@ -127,6 +126,8 @@ def main(args):
     log_base_path = os.path.join(args.logs, args.name)
     args.log_path = None
     if is_master(args, local=args.log_local) or is_main_process(accelerator):
+        if args.wandb_key:
+            wandb.login(key=args.wandb_key)
         os.makedirs(log_base_path, exist_ok=True)
         log_filename = f'out-{args.rank}' if args.log_local else 'out.log'
         args.log_path = os.path.join(log_base_path, log_filename)
@@ -403,7 +404,7 @@ def main(args):
         assert tensorboard is not None, "Please install tensorboard."
         writer = tensorboard.SummaryWriter(args.tensorboard_path)
     logging.info('attempting to start wandb')
-    if args.wandb:
+    if args.wandb and (is_master(args) or is_main_process(accelerator)):
         assert wandb is not None, 'Please install wandb.'
         logging.debug('Starting wandb.')
         args.train_sz = data["train"].dataloader.num_samples
@@ -413,8 +414,8 @@ def main(args):
         # you will have to configure this for your project!
         wandb.init(
             project=args.wandb_project_name,
+            dir=log_base_path,
             name=args.name,
-            id=args.name,
             notes=args.wandb_notes,
             tags=[],
             resume='auto' if args.resume == "latest" else None,
