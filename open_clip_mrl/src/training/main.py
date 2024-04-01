@@ -37,7 +37,7 @@ from training.params import parse_args
 from training.scheduler import cosine_lr, const_lr, const_lr_cooldown
 from training.train import train_one_epoch, evaluate
 from training.file_utils import pt_load, check_exists, start_sync_process, remote_sync
-
+from decimal import Decimal
 
 LATEST_CHECKPOINT_NAME = "epoch_latest.pt"
 
@@ -77,6 +77,14 @@ def main(args):
     args = parse_args(args)
     if args.wandb_key:
         wandb.login(key=args.wandb_key)
+
+
+    args.name = (f'{args.model}_mrl{args.force_mrl_loss}_'
+                f'bs{args.batch_size}_lr{"%.1E" % Decimal(args.lr)}_'
+                f'warmup{args.warmup}_'
+                f'gradacc{args.accum_freq}_'
+                f'prec{args.precision}_DS{args.use_deepspeed}')
+
     if args.use_deepspeed:
         # to solve NCCL timeout issue and increase timeout limit: from https://github.com/huggingface/accelerate/issues/314#issuecomment-1785782762
         process_group_kwargs = accelerate.InitProcessGroupKwargs(timeout=timedelta(seconds=10800))
