@@ -12,7 +12,7 @@ torchrun --nproc_per_node 4 --master_port 4329 -m training.main \
     --mrl_loss_weights "1,1,1,1,1" \
     --mrl_dim_to_consider "768,384,192,96,48" \
     --accum-freq 32 \
-    --batch-size 256 \
+    --batch-size 128 \
     --train-num-samples 3308333 \
     --lr 1e-07 \
     --workers 4 \

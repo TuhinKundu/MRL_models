@@ -19,6 +19,8 @@ def is_local_master(args):
 
 
 def is_master(args, local=False):
+    if args.use_deepspeed:
+        return False
     return is_local_master(args) if local else is_global_master(args)
 
 
@@ -65,9 +67,10 @@ def init_distributed_device(args):
     # Distributed training = training on more than one GPU.
     # Works in both single and multi-node scenarios.
     args.distributed = False
-    args.world_size = 1
+    #args.world_size = 1
     args.rank = 0  # global rank
     args.local_rank = 0
+
     if args.horovod:
         assert hvd is not None, "Horovod is not installed"
         hvd.init()
@@ -95,19 +98,29 @@ def init_distributed_device(args):
             )
         else:
             # DDP via torchrun, torch.distributed.launch
-            args.local_rank, _, _ = world_info_from_env()
+
+
+            args.local_rank, _, world_size = world_info_from_env()
+
+            print(world_info_from_env())
             torch.distributed.init_process_group(
                 backend=args.dist_backend,
-                init_method=args.dist_url,
+                #rank=args.local_rank,
+                world_size=world_size,
                 timeout=timedelta(seconds=10800)
                 )
+
             args.world_size = torch.distributed.get_world_size()
             args.rank = torch.distributed.get_rank()
+
+
+
+
         args.distributed = True
 
     if torch.cuda.is_available():
         if args.distributed and not args.no_set_device_rank:
-            device = 'cuda:%d' % args.local_rank
+            device = 'cuda'
         else:
             device = 'cuda:0'
         torch.cuda.set_device(device)
@@ -115,6 +128,7 @@ def init_distributed_device(args):
         device = 'cpu'
     args.device = device
     device = torch.device(device)
+
     return device
 
 

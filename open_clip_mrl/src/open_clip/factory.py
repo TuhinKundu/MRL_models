@@ -210,6 +210,7 @@ def create_model(
                     load_checkpoint(model, checkpoint_path, strict=False)
                 else: 
                     load_checkpoint(model, checkpoint_path)
+                logging.info('weights loaded successfully.')
             else:
                 error_str = (
                     f'Pretrained weights ({pretrained}) not found for model {model_name}.'
@@ -230,7 +231,7 @@ def create_model(
         model.to(device=device)
         if precision in ("fp16", "bf16"):
             convert_weights_to_lp(model, dtype=torch.bfloat16 if precision == 'bf16' else torch.float16)
-
+            logging.info(f'weights converted to {precision}')
         # set image / mean metadata from pretrained_cfg if available, or use default
         model.visual.image_mean = pretrained_cfg.get('mean', None) or OPENAI_DATASET_MEAN
         model.visual.image_std = pretrained_cfg.get('std', None) or OPENAI_DATASET_STD
@@ -305,7 +306,7 @@ def create_model_and_transforms(
         cache_dir: Optional[str] = None,
         output_dict: Optional[bool] = None,
         use_mrl: Optional[bool] = False, 
-        mrl_dim: int = 0
+        mrl_dim: int = 0,
 ):
     model = create_model(
         model_name,

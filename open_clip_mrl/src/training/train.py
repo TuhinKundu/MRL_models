@@ -59,10 +59,16 @@ def backward(total_loss, scaler):
         total_loss.backward()
 
 
-def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=None):
-    device = torch.device(args.device)
+def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=None):
+    if not args.use_deepspeed:
+        device = torch.device(args.device)
+        cast_dtype = model.get_data_types()[0]
+
+    else:
+        device = accelerator.device
+
+        cast_dtype = get_cast_dtype(args.precision)
     autocast = get_autocast(args.precision)
-    cast_dtype = get_cast_dtype(args.precision)
 
 
     model.train()
@@ -81,7 +87,10 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
     batch_time_m = AverageMeter()
     data_time_m = AverageMeter()
     end = time.time()
+    logging.info(f'start model training and mrl {args.force_mrl_loss}')
+
     for i, batch in enumerate(dataloader):
+
         i_accum = i // args.accum_freq
         step = num_batches_per_epoch * epoch + i_accum
 
@@ -89,11 +98,16 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
             scheduler(step)
 
         images, texts = batch
-        images = images.to(device=device, dtype=cast_dtype, non_blocking=True)
-        texts = texts.to(device=device, non_blocking=True)
+        if not args.use_deepspeed:
+            images = images.to(device=device, dtype=cast_dtype, non_blocking=True)
+            texts = texts.to(device=device, non_blocking=True)
+        else:
+            images = images.to(device=device)
+            texts = texts.to(device=device)
 
         data_time_m.update(time.time() - end)
         optimizer.zero_grad()
+
 
         if args.accum_freq == 1:
             with autocast():
@@ -111,9 +125,16 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
             backward(total_loss, scaler)
         else:
             # First, cache the features without any gradient tracking.
+
             with torch.no_grad():
                 with autocast():
-                    model_out = model(images, texts)
+                    batch = {
+                        'image': images,
+                        'text': texts
+                    }
+
+
+                    model_out = model(**batch)
                     model_out.pop("logit_scale")
                     for key, val in model_out.items():
                         if key in accum_features:
@@ -121,9 +142,8 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
                         else:
                             accum_features[key] = [val]
 
-                accum_images.append(images)
-                accum_texts.append(texts)
-
+                    accum_images.append(images)
+                    accum_texts.append(texts)
             # If (i + 1) % accum_freq is not zero, move on to the next batch.
             if ((i + 1) % args.accum_freq) > 0:
                 # FIXME this makes data time logging unreliable when accumulating
@@ -146,8 +166,12 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
                     losses = loss(**inputs, logit_scale=logit_scale, output_dict=True)
                     del inputs
                     total_loss = sum(losses.values())
+
                     losses["loss"] = total_loss
-                backward(total_loss, scaler)
+                if not args.use_deepspeed:
+                    backward(total_loss, scaler)
+                else:
+                    accelerator.backward(total_loss)
 
         if scaler is not None:
             if args.horovod:
@@ -168,11 +192,13 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip_norm, norm_type=2.0)
             optimizer.step()
 
+
         # reset gradient accum, if enabled
         if args.accum_freq > 1:
             accum_images, accum_texts, accum_features = [], [], {}
 
         # Note: we clamp to 4.6052 = ln(100), as in the original paper.
+
         with torch.no_grad():
             if args.force_mrl_loss: 
                 for idx in range(len(args.mrl_dim_to_consider)):
@@ -183,7 +209,7 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
         batch_time_m.update(time.time() - end)
         end = time.time()
         batch_count = i_accum + 1
-        if is_master(args) and (i_accum % args.log_every_n_steps == 0 or batch_count == num_batches_per_epoch):
+        if (is_master(args) or accelerator.is_main_process) and (i_accum % args.log_every_n_steps == 0 or batch_count == num_batches_per_epoch):
             batch_size = len(images)
             num_samples = batch_count * batch_size * args.accum_freq * args.world_size
             samples_per_epoch = dataloader.num_samples

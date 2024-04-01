@@ -11,7 +11,9 @@ import numpy as np
 import torch
 from torch import optim
 from torch.cuda.amp import GradScaler
-
+import accelerate
+from datetime import timedelta
+from accelerate import DeepSpeedPlugin
 try:
     import wandb
 except ImportError:
@@ -66,13 +68,24 @@ def get_latest_checkpoint(path: str, remote : bool):
         return checkpoints[-1]
     return None
 
-
+def is_main_process(accelerator):
+    if accelerator:
+        return True
+    else:
+        return False
 def main(args):
     args = parse_args(args)
     if args.wandb_key:
         wandb.login(key=args.wandb_key)
+    if args.use_deepspeed:
+        # to solve NCCL timeout issue and increase timeout limit: from https://github.com/huggingface/accelerate/issues/314#issuecomment-1785782762
+        process_group_kwargs = accelerate.InitProcessGroupKwargs(timeout=timedelta(seconds=10800))
+        accelerator = accelerate.Accelerator(split_batches=True, kwargs_handlers=[
+            process_group_kwargs])
+        args.distributed = False #switch off torch ddp as HF accelerate will handle everything under hood
+        device = accelerator.device
 
-    if torch.cuda.is_available():
+    elif torch.cuda.is_available():
         # This enables tf32 on Ampere GPUs which is only 8% slower than
         # float16 and almost as accurate as float32
         # This was a default in pytorch until 1.12
@@ -81,7 +94,9 @@ def main(args):
         torch.backends.cudnn.deterministic = False
 
     # fully initialize distributed device environment
-    device = init_distributed_device(args)
+    if not args.use_deepspeed:
+        device = init_distributed_device(args)
+        accelerator=None
 
     # get the name of the experiments
     if args.name is None:
@@ -103,7 +118,7 @@ def main(args):
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
     args.log_path = None
-    if is_master(args, local=args.log_local):
+    if is_master(args, local=args.log_local) or is_main_process(accelerator):
         os.makedirs(log_base_path, exist_ok=True)
         log_filename = f'out-{args.rank}' if args.log_local else 'out.log'
         args.log_path = os.path.join(log_base_path, log_filename)
@@ -111,7 +126,7 @@ def main(args):
             print(
                 "Error. Experiment already exists. Use --name {} to specify a new experiment."
             )
-            return -1
+
 
     # Setup text logger
     args.log_level = logging.DEBUG if args.debug else logging.INFO
@@ -121,7 +136,7 @@ def main(args):
     args.wandb = 'wandb' in args.report_to or 'all' in args.report_to
     args.tensorboard = 'tensorboard' in args.report_to or 'all' in args.report_to
     args.checkpoint_path = os.path.join(log_base_path, "checkpoints")
-    if is_master(args):
+    if is_master(args) or is_main_process(accelerator):
         args.tensorboard_path = os.path.join(log_base_path, "tensorboard") if args.tensorboard else ''
         for dirname in [args.tensorboard_path, args.checkpoint_path]:
             if dirname:
@@ -141,7 +156,7 @@ def main(args):
             if args.remote_sync_protocol != 's3':
                 print('Error. Sync protocol not supported when using resume latest.')
                 return -1
-        if is_master(args):
+        if is_master(args) or is_main_process(accelerator):
             # Checking for existing checkpoint via master rank only. It is possible for
             # different rank processes to see different files if a shared file-system is under
             # stress, however it's very difficult to fully work around such situations.
@@ -168,7 +183,7 @@ def main(args):
 
     # start the sync proces if remote-sync is not None
     remote_sync_process = None
-    if is_master(args) and args.remote_sync is not None:
+    if (is_master(args) or is_main_process(accelerator)) and args.remote_sync is not None:
         # first make sure it works
         result = remote_sync(
             os.path.join(args.logs, args.name), 
@@ -202,6 +217,8 @@ def main(args):
         logging.info(
             f'Running in distributed mode with multiple processes. Device: {args.device}.'
             f'Process (global: {args.rank}, local {args.local_rank}), total {args.world_size}.')
+    elif args.use_deepspeed:
+        logging.info('using deepspeed and huggingface accelerate')
     else:
         logging.info(f'Running with a single process. Device {args.device}.')
 
@@ -235,6 +252,7 @@ def main(args):
         use_mrl=args.force_mrl_loss,
         mrl_dim = len(args.mrl_dim_to_consider)
     )
+
     if args.distill:
         # FIXME: currenlty assumes the model your distilling from has the same tokenizer & transforms.
         dist_model, _, _ = create_model_and_transforms(
@@ -244,12 +262,14 @@ def main(args):
             precision=args.precision,
             output_dict=True,
         )
-
+    if args.use_deepspeed:
+        args.rank = accelerator.process_index
+        args.world_size = accelerator.num_processes
     random_seed(args.seed, args.rank)
-
+    logging.info(f"Random seed: {args.seed} and rank {args.rank}")
     if args.trace:
         model = trace_model(model, batch_size=args.batch_size, device=device)
-
+    logging.info(f'trace model {args.trace}')
     if args.lock_image:
         # lock image tower as per LiT - https://arxiv.org/abs/2111.07991
         model.lock_image_tower(
@@ -259,11 +279,11 @@ def main(args):
         model.lock_text_tower(
             unlocked_layers=args.lock_text_unlocked_layers,
             freeze_layer_norm=args.lock_text_freeze_layer_norm)
-
+    logging.info(f'lock text {args.lock_text} and image {args.lock_image}')
     if args.grad_checkpointing:
         model.set_grad_checkpointing()
 
-    if is_master(args):
+    if is_master(args) or is_main_process(accelerator):
         logging.info("Model:")
         logging.info(f"{str(model)}")
         logging.info("Params:")
@@ -273,23 +293,27 @@ def main(args):
                 val = getattr(args, name)
                 logging.info(f"  {name}: {val}")
                 f.write(f"{name}: {val}\n")
+    logging.info(f"distributed training {args.distributed}")
+    if args.distributed and not args.horovod and is_master(args):
 
-    if args.distributed and not args.horovod:
         if args.use_bn_sync:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         ddp_args = {}
         if args.ddp_static_graph:
             # this doesn't exist in older PyTorch, arg only added if enabled
             ddp_args['static_graph'] = True
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[device], **ddp_args)
-    
+        #device_id = torch.distributed.get_rank() % torch.cuda.device_count()
+        logging.info(f'initializing torch ddp {ddp_args} with device {device} ')
+
+        model = torch.nn.parallel.DataParallel(model, device_ids= [device], **ddp_args)
+        logging.info('initialized torch ddp')
         if args.distill:
-            dist_model = torch.nn.parallel.DistributedDataParallel(dist_model, device_ids=[device], **ddp_args)
+            dist_model = torch.nn.parallel.DistributedDataParallel(dist_model, **ddp_args)
 
     # create optimizer and scaler
     optimizer = None
     scaler = None
-
+    logging.info(f'train data {args.train_data} and type {args.dataset_type}')
     if args.train_data or args.dataset_type == "synthetic":
         assert not args.trace, 'Cannot train with traced model'
 
@@ -318,6 +342,7 @@ def main(args):
 
     # optionally resume from a checkpoint
     start_epoch = 0
+
     if args.resume is not None:
         checkpoint = pt_load(args.resume, map_location='cpu')
         if 'epoch' in checkpoint:
@@ -343,7 +368,9 @@ def main(args):
 
     # create scheduler if train
     scheduler = None
+
     if 'train' in data and optimizer is not None:
+        logging.info(f'optimizer has been set and scheduler is {args.lr_scheduler}')
         total_steps = (data["train"].dataloader.num_batches // args.accum_freq) * args.epochs
         if args.lr_scheduler == "cosine":
             scheduler = cosine_lr(optimizer, args.lr, args.warmup, total_steps)
@@ -362,16 +389,17 @@ def main(args):
             exit(1)
 
     # determine if this worker should save logs and checkpoints. only do so if it is rank == 0
-    args.save_logs = args.logs and args.logs.lower() != 'none' and is_master(args)
+    args.save_logs = args.logs and args.logs.lower() != 'none' and (is_master(args) or is_main_process(accelerator))
     writer = None
     if args.save_logs and args.tensorboard:
         assert tensorboard is not None, "Please install tensorboard."
         writer = tensorboard.SummaryWriter(args.tensorboard_path)
-
-    if args.wandb and is_master(args):
+    logging.info('attempting to start wandb')
+    if args.wandb:
         assert wandb is not None, 'Please install wandb.'
         logging.debug('Starting wandb.')
         args.train_sz = data["train"].dataloader.num_samples
+
         if args.val_data is not None:
             args.val_sz = data["val"].dataloader.num_samples
         # you will have to configure this for your project!
@@ -384,9 +412,11 @@ def main(args):
             resume='auto' if args.resume == "latest" else None,
             config=vars(args),
         )
+        logging.info('wandb initialized')
         if args.debug:
             wandb.watch(model, log='all')
-        wandb.save(params_file)
+        if is_master(args) or is_main_process(accelerator):
+            wandb.save(params_file)
         logging.debug('Finished loading wandb.')
 
     if 'train' not in data:
@@ -394,12 +424,21 @@ def main(args):
         return
 
     loss = create_loss(args)
+    logging.info('loss created')
 
+    if args.use_deepspeed:
+        accelerator.state.deepspeed_plugin.__post_init__()
+        accelerator.state.deepspeed_plugin.deepspeed_config[
+            'train_micro_batch_size_per_gpu'] = args.batch_size // accelerator.num_processes
+        data['train'].dataloader.batch_size = args.batch_size
+        model, optimizer, scheduler = accelerator._prepare_deepspeed(model, optimizer, scheduler)
+
+        if args.precision in ['bf16', 'bfloat16']:
+            accelerator.deepspeed_config['bf16']['enabled'] = True
     for epoch in range(start_epoch, args.epochs):
-        if is_master(args):
+        if is_master(args) or is_main_process(accelerator):
             logging.info(f'Start epoch {epoch}')
-
-        train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
+        train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 
         if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
@@ -407,10 +446,14 @@ def main(args):
 
         # Saving checkpoints.
         if args.save_logs:
+            if args.use_deepspeed:
+                sd = model.module.state_dict()
+            else:
+                sd = model.state_dict()
             checkpoint_dict = {
                 "epoch": completed_epoch,
                 "name": args.name,
-                "state_dict": model.state_dict(),
+                "state_dict": sd,
                 "optimizer": optimizer.state_dict(),
             }
             if scaler is not None:
@@ -435,7 +478,7 @@ def main(args):
                 torch.save(checkpoint_dict, tmp_save_path)
                 os.replace(tmp_save_path, latest_save_path)
 
-    if args.wandb and is_master(args):
+    if args.wandb and (is_master(args) or is_main_process(accelerator)):
         wandb.finish()
 
     # run a final sync.

@@ -436,6 +436,12 @@ def parse_args(args):
         help="whether to use MRL based loss"
     )
     parser.add_argument(
+        "--use_deepspeed",
+        default=True,
+        action="store_true",
+        help="whether to use deepspeed"
+    )
+    parser.add_argument(
         "--mrl_loss_weights", 
         default=[1,1,1,1,1], 
         type=parse_mrl_loss_weights, 
@@ -448,6 +454,7 @@ def parse_args(args):
         help="weights for loss weights, dimensions are considered in following order 8, 16, 32, 64, 128, 256, 512, 768"
     )
     parser.add_argument('--wandb_key', default=None, type=str, help="key to login to wandb")
+    parser.add_argument('--lr_scheduler', default='cosine', type=str, help="define scheduler")
     args = parser.parse_args(args)
 
     # If some params are not passed, we use the default values based on model name.
