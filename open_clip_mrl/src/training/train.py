@@ -102,7 +102,7 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
             images = images.to(device=device, dtype=cast_dtype, non_blocking=True)
             texts = texts.to(device=device, non_blocking=True)
         else:
-            images = images.to(device=device)
+            images = images.to(device=device, dtype=cast_dtype) #bf16 not supported due to layer norm not expecting CUDABFloat16Type, fix layer norm in open_clip code
             texts = texts.to(device=device)
 
         data_time_m.update(time.time() - end)

@@ -444,6 +444,8 @@ def main(args):
 
         if args.precision in ['bf16', 'bfloat16']:
             accelerator.deepspeed_config['bf16']['enabled'] = True
+        else:
+            accelerator.deepspeed_config['bf16']['enabled'] = False
     for epoch in range(start_epoch, args.epochs):
         if is_master(args) or is_main_process(accelerator):
             logging.info(f'Start epoch {epoch}')
