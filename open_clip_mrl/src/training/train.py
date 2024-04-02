@@ -144,6 +144,8 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
 
                     accum_images.append(images)
                     accum_texts.append(texts)
+
+            print(i)
             # If (i + 1) % accum_freq is not zero, move on to the next batch.
             if ((i + 1) % args.accum_freq) > 0:
                 # FIXME this makes data time logging unreliable when accumulating
