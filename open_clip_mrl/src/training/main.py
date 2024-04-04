@@ -14,6 +14,7 @@ from torch.cuda.amp import GradScaler
 import accelerate
 from datetime import timedelta
 from accelerate import DeepSpeedPlugin
+import string
 try:
     import wandb
 except ImportError:
@@ -124,6 +125,9 @@ def main(args):
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
+    if os.path.exists(log_base_path):
+        rand_str = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(7))
+        log_base_path += '_'+rand_str
     args.log_path = None
     if is_master(args, local=args.log_local) or is_main_process(accelerator):
         if args.wandb_key:
@@ -135,6 +139,8 @@ def main(args):
             print(
                 "Error. Experiment already exists. Use --name {} to specify a new experiment."
             )
+            print('logging path is ', log_base_path)
+
 
 
     # Setup text logger
