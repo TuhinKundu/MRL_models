@@ -13,7 +13,7 @@ from torch import optim
 from torch.cuda.amp import GradScaler
 import accelerate
 from datetime import timedelta
-from accelerate import DeepSpeedPlugin
+from training.train import is_main_process
 import string
 try:
     import wandb
@@ -69,11 +69,7 @@ def get_latest_checkpoint(path: str, remote : bool):
         return checkpoints[-1]
     return None
 
-def is_main_process(accelerator):
-    if accelerator.is_main_process:
-        return True
-    else:
-        return False
+
 def main(args):
     args = parse_args(args)
 
@@ -249,6 +245,8 @@ def main(args):
         # arg is nargs, single (square) image size list -> int
         args.force_image_size = args.force_image_size[0]
     random_seed(args.seed, 0)
+    if args.use_deepspeed:
+        accelerator.wait_for_everyone()
     model, preprocess_train, preprocess_val = create_model_and_transforms(
         args.model,
         args.pretrained,
@@ -329,7 +327,7 @@ def main(args):
     optimizer = None
     scaler = None
     logging.info(f'train data {args.train_data} and type {args.dataset_type}')
-    if args.train_data or args.dataset_type == "synthetic":
+    if args.train_data or args.dataset_type == "synthetic" :
         assert not args.trace, 'Cannot train with traced model'
 
         exclude = lambda n, p: p.ndim < 2 or "bn" in n or "ln" in n or "bias" in n or 'logit_scale' in n
@@ -435,7 +433,7 @@ def main(args):
         logging.debug('Finished loading wandb.')
 
     if 'train' not in data:
-        evaluate(model, data, start_epoch, args, writer)
+        evaluate(accelerator, model, data, start_epoch, args, writer)
         return
 
     loss = create_loss(args)
@@ -456,6 +454,9 @@ def main(args):
             accelerator.deepspeed_config['bf16']['enabled'] = False
             accelerator.deepspeed_config['fp16']['enabled'] = False
 
+    if is_master(args) or is_main_process(accelerator):
+        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
+            evaluate(accelerator, model, data, 0, args, writer)
 
     for epoch in range(start_epoch, args.epochs):
         if is_master(args) or is_main_process(accelerator):
@@ -464,8 +465,10 @@ def main(args):
         train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 
-        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
-            evaluate(model, data, completed_epoch, args, writer)
+
+        if is_master(args) or is_main_process(accelerator):
+            if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
+                evaluate(accelerator, model, data, completed_epoch, args, writer)
 
         # Saving checkpoints.
         if args.save_logs:

@@ -45,6 +45,13 @@ def postprocess_clip_output(model_out):
         "logit_scale": model_out[2]
     }
 
+def is_main_process(accelerator):
+    if not accelerator:
+        return False
+    if accelerator.is_main_process:
+        return True
+    else:
+        return False
 def unwrap_model(model):
     if hasattr(model, 'module'):
         return model.module
@@ -282,8 +289,7 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
 def evaluate(accelerator, model, data, epoch, args, tb_writer=None):
     logging.info('starting evaluation...')
     metrics = {}
-    if not (is_master(args) or accelerator.is_main_process):
-        return metrics
+
     if not args.use_deepspeed:
         device = torch.device(args.device)
         cast_dtype = get_cast_dtype(args.precision)

@@ -102,7 +102,7 @@ def zero_shot_eval(model, data, epoch, args, device, cast_dtype):
     # for other losses than MRL
     else: 
         logging.info('Building zero-shot classifier')
-        classifier = zero_shot_classifier(model, imagenet_classnames, openai_imagenet_template, 0, args, device, cast_dtype)
+        classifier = zero_shot_classifier(model, imagenet_classnames, openai_imagenet_template, 0, args, device)
 
         logging.info('Using classifier')
         results = {}
