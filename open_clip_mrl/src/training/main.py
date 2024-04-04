@@ -438,17 +438,23 @@ def main(args):
     if args.use_deepspeed:
         accelerator.state.deepspeed_plugin.__post_init__()
         accelerator.state.deepspeed_plugin.deepspeed_config[
-            'train_micro_batch_size_per_gpu'] = args.batch_size // accelerator.num_processes
-        data['train'].dataloader.batch_size = args.batch_size
+            'train_micro_batch_size_per_gpu'] = args.batch_size
+        data['train'].dataloader.batch_size = args.batch_size * accelerator.num_processes
         model, optimizer, scheduler = accelerator._prepare_deepspeed(model, optimizer, scheduler)
 
         if args.precision in ['bf16', 'bfloat16']:
             accelerator.deepspeed_config['bf16']['enabled'] = True
+        elif args.precision == 'fp16':
+            accelerator.deepspeed_config['fp16']['enabled']=True
         else:
             accelerator.deepspeed_config['bf16']['enabled'] = False
+            accelerator.deepspeed_config['fp16']['enabled'] = False
+
+
     for epoch in range(start_epoch, args.epochs):
         if is_master(args) or is_main_process(accelerator):
             logging.info(f'Start epoch {epoch}')
+
         train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 

@@ -279,18 +279,26 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
     # end for
 
 
-def evaluate(model, data, epoch, args, tb_writer=None):
+def evaluate(accelerator, model, data, epoch, args, tb_writer=None):
+    logging.info('starting evaluation...')
     metrics = {}
-    if not is_master(args):
+    if not (is_master(args) or accelerator.is_main_process):
         return metrics
-    device = torch.device(args.device)
+    if not args.use_deepspeed:
+        device = torch.device(args.device)
+        cast_dtype = get_cast_dtype(args.precision)
+    else:
+        device = accelerator.device
+
+        cast_dtype = get_cast_dtype(args.precision)
+
     model.eval()
 
-    zero_shot_metrics = zero_shot_eval(model, data, epoch, args)
+    zero_shot_metrics = zero_shot_eval(model, data, epoch, args, device, cast_dtype)
     metrics.update(zero_shot_metrics)
 
     autocast = get_autocast(args.precision)
-    cast_dtype = get_cast_dtype(args.precision)
+
 
     if 'val' in data and (args.val_frequency and ((epoch % args.val_frequency) == 0 or epoch == args.epochs)):
         dataloader = data['val'].dataloader
@@ -302,6 +310,7 @@ def evaluate(model, data, epoch, args, tb_writer=None):
         cumulative_loss = 0.0
         cumulative_gen_loss = 0.0
         all_image_features, all_text_features = [], []
+
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 images, texts = batch
