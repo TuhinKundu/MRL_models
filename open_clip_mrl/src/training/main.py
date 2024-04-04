@@ -69,7 +69,7 @@ def get_latest_checkpoint(path: str, remote : bool):
     return None
 
 def is_main_process(accelerator):
-    if accelerator:
+    if accelerator.is_main_process:
         return True
     else:
         return False
@@ -82,7 +82,7 @@ def main(args):
                 f'bs{args.batch_size}_lr{"%.1E" % Decimal(args.lr)}_'
                 f'warmup{args.warmup}_'
                 f'gradacc{args.accum_freq}_'
-                f'prec{args.precision}_DS{args.use_deepspeed}')
+                f'prec{args.precision}_DS{args.use_deepspeed}_{args.wandb_project_name}')
 
     if args.use_deepspeed:
         # to solve NCCL timeout issue and increase timeout limit: from https://github.com/huggingface/accelerate/issues/314#issuecomment-1785782762
