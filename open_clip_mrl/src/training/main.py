@@ -14,6 +14,7 @@ from torch.cuda.amp import GradScaler
 import accelerate
 from datetime import timedelta
 from training.train import is_main_process
+
 import string
 try:
     import wandb
@@ -82,10 +83,14 @@ def main(args):
                 f'prec{args.precision}_DS{args.use_deepspeed}_{args.wandb_project_name}')
 
     if args.use_deepspeed:
+        kwargs_handlers = []
         # to solve NCCL timeout issue and increase timeout limit: from https://github.com/huggingface/accelerate/issues/314#issuecomment-1785782762
         process_group_kwargs = accelerate.InitProcessGroupKwargs(timeout=timedelta(seconds=10800))
-        accelerator = accelerate.Accelerator(split_batches=True, kwargs_handlers=[
-            process_group_kwargs])
+        kwargs_handlers.append(process_group_kwargs)
+        if args.precision == 'amp':
+            grad_kwargs = accelerate.utils.GradScalerKwargs(enabled=True)
+            kwargs_handlers.append(grad_kwargs)
+        accelerator = accelerate.Accelerator(split_batches=True, kwargs_handlers=kwargs_handlers)
         args.distributed = False #switch off torch ddp as HF accelerate will handle everything under hood
         device = accelerator.device
 
@@ -440,12 +445,14 @@ def main(args):
     logging.info('loss created')
 
     if args.use_deepspeed:
+        scaler=None
         accelerator.state.deepspeed_plugin.__post_init__()
         accelerator.state.deepspeed_plugin.deepspeed_config[
             'train_micro_batch_size_per_gpu'] = args.batch_size
+
         data['train'].dataloader.batch_size = args.batch_size * accelerator.num_processes
         model, optimizer, scheduler = accelerator._prepare_deepspeed(model, optimizer, scheduler)
-        scaler = None
+
         if args.precision in ['bf16', 'bfloat16']:
             accelerator.deepspeed_config['bf16']['enabled'] = True
         elif args.precision == 'fp16':
@@ -456,6 +463,7 @@ def main(args):
             accelerator.deepspeed_config['bf16']['enabled'] = False
             accelerator.deepspeed_config['fp16']['enabled'] = False
             accelerator.deepspeed_config['amp']['enabled'] = False
+        #accelerator.deepspeed_config['gradient_clipping'] = args.grad_clip_norm
 
     #if is_master(args) or is_main_process(accelerator):
     #    if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):

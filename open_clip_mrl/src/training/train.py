@@ -180,8 +180,7 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
                 if not args.use_deepspeed:
                     backward(total_loss, scaler)
                 else:
-                    if scaler is not None:
-                        total_loss = scaler.scale(total_loss)
+
                     accelerator.backward(total_loss)
 
 
