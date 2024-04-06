@@ -465,9 +465,9 @@ def main(args):
             accelerator.deepspeed_config['amp']['enabled'] = False
         #accelerator.deepspeed_config['gradient_clipping'] = args.grad_clip_norm
 
-    #if is_master(args) or is_main_process(accelerator):
-    #    if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
-    #        evaluate(accelerator, model, data, 0, args, writer)
+    if is_master(args) or is_main_process(accelerator):
+        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
+            evaluate(accelerator, model, data, 0, args, writer)
 
     for epoch in range(start_epoch, args.epochs):
         if is_master(args) or is_main_process(accelerator):
