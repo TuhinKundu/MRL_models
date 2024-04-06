@@ -449,25 +449,26 @@ def main(args):
         accelerator.state.deepspeed_plugin.__post_init__()
         accelerator.state.deepspeed_plugin.deepspeed_config[
             'train_micro_batch_size_per_gpu'] = args.batch_size
-
         data['train'].dataloader.batch_size = args.batch_size * accelerator.num_processes
-        model, optimizer, scheduler = accelerator._prepare_deepspeed(model, optimizer, scheduler)
 
         if args.precision in ['bf16', 'bfloat16']:
-            accelerator.deepspeed_config['bf16']['enabled'] = True
+            accelerator.state.deepspeed_plugin.deepspeed_config['bf16']['enabled'] = True
+            accelerator.state.deepspeed_plugin.deepspeed_config['fp16']['enabled'] = False
         elif args.precision == 'fp16':
-            accelerator.deepspeed_config['fp16']['enabled']=True
-        elif args.precision == 'amp':
-            accelerator.deepspeed_config['amp']['enabled']=True
+            accelerator.state.deepspeed_plugin.deepspeed_config['fp16']['enabled']=True
+            accelerator.state.deepspeed_plugin.deepspeed_config['bf16']['enabled'] = False
         else:
-            accelerator.deepspeed_config['bf16']['enabled'] = False
-            accelerator.deepspeed_config['fp16']['enabled'] = False
-            accelerator.deepspeed_config['amp']['enabled'] = False
+            accelerator.state.deepspeed_plugin.deepspeed_config['bf16']['enabled'] = False
+            accelerator.state.deepspeed_plugin.deepspeed_config['fp16']['enabled'] = False
+
+
+        model, optimizer, scheduler = accelerator._prepare_deepspeed(model, optimizer, scheduler)
+
         #accelerator.deepspeed_config['gradient_clipping'] = args.grad_clip_norm
 
-    if is_master(args) or is_main_process(accelerator):
-        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
-            evaluate(accelerator, model, data, 0, args, writer)
+    #if is_master(args) or is_main_process(accelerator):
+    #    if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
+    #        evaluate(accelerator, model, data, 0, args, writer)
 
     for epoch in range(start_epoch, args.epochs):
         if is_master(args) or is_main_process(accelerator):

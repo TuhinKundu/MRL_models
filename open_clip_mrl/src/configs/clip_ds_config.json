@@ -2,11 +2,8 @@
     "bf16": {
         "enabled": false
     },
-    "amp": {
-        "enabled": false
-    },
     "fp16": {
-        "enabled": true,
+        "enabled": false,
         "auto_cast": false,
         "loss_scale": 0,
         "initial_scale_power": 16,

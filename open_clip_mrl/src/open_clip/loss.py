@@ -243,7 +243,7 @@ class MRLClipLoss(ClipLoss):
             text = F.normalize( text_features[:,:dim], dim=-1) # slice and normalize 
             loss = super().forward(image_features=img, text_features=text, logit_scale=logit_scale[idx])
             # total_loss += self.mrl_loss_weights[idx] * loss
-            loss_list.append(self.mrl_loss_weights[idx] * loss)
+            loss_list.append(self.mrl_loss_weights[idx]/sum(self.mrl_loss_weights) * loss)
             
         if output_dict:
             return {f"mrl_clip_loss_{key}": value for key, value in zip(self.dim_to_consider, loss_list)} 
