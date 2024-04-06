@@ -59,8 +59,9 @@ def unwrap_model(model):
         return model
 
 
-def backward(total_loss, scaler):
+def backward(total_loss, scaler, use_deepspeed=False):
     if scaler is not None:
+
         scaler.scale(total_loss).backward()
     else:
         total_loss.backward()
@@ -109,7 +110,7 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
             images = images.to(device=device, dtype=cast_dtype, non_blocking=True)
             texts = texts.to(device=device, non_blocking=True)
         else:
-            images = images.to(device=device, dtype=cast_dtype) #bf16 not supported due to layer norm not expecting CUDABFloat16Type, fix layer norm in open_clip code
+            images = images.to(device=device, dtype=cast_dtype)
             texts = texts.to(device=device)
 
         data_time_m.update(time.time() - end)
@@ -152,6 +153,7 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
                     accum_images.append(images)
                     accum_texts.append(texts)
             # If (i + 1) % accum_freq is not zero, move on to the next batch.
+
             if ((i + 1) % args.accum_freq) > 0:
                 # FIXME this makes data time logging unreliable when accumulating
                 continue
@@ -178,7 +180,10 @@ def train_one_epoch(accelerator, model, data, loss, epoch, optimizer, scaler, sc
                 if not args.use_deepspeed:
                     backward(total_loss, scaler)
                 else:
+                    if scaler is not None:
+                        total_loss = scaler.scale(total_loss)
                     accelerator.backward(total_loss)
+
 
         if scaler is not None:
             if args.horovod:

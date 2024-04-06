@@ -1,6 +1,9 @@
 {
     "bf16": {
-        "enabled": true
+        "enabled": false
+    },
+    "amp": {
+        "enabled": false
     },
     "fp16": {
         "enabled": false,
