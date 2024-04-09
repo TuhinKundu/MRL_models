@@ -104,6 +104,7 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
         required=True,
     )
+    parser.add_argument('--nesting_dim', type=int, default=None, help="MRL dim size")
 
     parser.add_argument(
         "--use_slow_tokenizer",
@@ -335,6 +336,7 @@ def main(args):
         finetuning_task=args.task_name,
         trust_remote_code=args.trust_remote_code,
     )
+    config.nesting_dim = args.nesting_dim
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path, use_fast=not args.use_slow_tokenizer, trust_remote_code=args.trust_remote_code
     )
@@ -347,10 +349,11 @@ def main(args):
     )
     if args.pretrained_weights:
         pretrained_weights = torch.load(args.pretrained_weights)
-        #pretrained_weights['module']['bert.pooler.dense.weight'] = pretrained_weights['module']['cls.predictions.transform.dense.weight']
-        #pretrained_weights['module']['bert.pooler.dense.bias'] = pretrained_weights['module']['cls.predictions.transform.dense.bias']
+        pretrained_weights['module']['bert.pooler.dense.weight'] = pretrained_weights['module']['cls.predictions.transform.dense.weight']
+        pretrained_weights['module']['bert.pooler.dense.bias'] = pretrained_weights['module']['cls.predictions.transform.dense.bias']
         msg = model.load_state_dict(pretrained_weights['module'], strict=False)
         print('message:', msg)
+
     #exit()
     # Preprocessing the datasets
     if args.task_name is not None:
@@ -628,8 +631,8 @@ def main(args):
                 else:
                     samples_seen += references.shape[0]
             metric.add_batch(
-                predictions=predictions,
-                references=references,
+                predictions=predictions.to(torch.float32),
+                references=references.to(torch.float32),
             )
             eval_progress_bar.update(1)
 
