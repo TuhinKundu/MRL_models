@@ -27,6 +27,7 @@ import json
 import logging
 import math
 import os
+import time
 import random
 from itertools import chain
 from pathlib import Path
@@ -127,6 +128,7 @@ def parse_args():
     parser.add_argument(
         "--use_mrl",
         action="store_true",
+        default=False,
         help="If passed, will use a MRL model."
     )
     parser.add_argument(
@@ -273,6 +275,8 @@ def parse_args():
 
     if isinstance(args.loss_weights, str):
         args.loss_weights = args.loss_weights.split(",")
+
+
     # Sanity checks
     if args.dataset_name is None and args.train_file is None and args.validation_file is None:
         raise ValueError("Need either a dataset name or a training/validation file.")
@@ -286,10 +290,11 @@ def parse_args():
             if extension not in ["csv", "json", "txt"]:
                 raise ValueError("`validation_file` should be a csv, json or txt file.")
 
+
     if args.push_to_hub:
         if args.output_dir is None:
             raise ValueError("Need an `output_dir` to create a repo when `--push_to_hub` is passed.")
-
+    args.output_dir = args.output_dir +'/' +time.strftime("%Y-%m-%d_%H:%M") + f'_mrl{args.use_mrl}'
     return args
 
 
