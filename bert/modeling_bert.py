@@ -1538,13 +1538,18 @@ class BertForSequenceClassification(BertPreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.config = config
+        self.nesting_dim = config.nesting_dim
 
         self.bert = BertModel(config)
         classifier_dropout = (
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.dropout = nn.Dropout(classifier_dropout)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
+        if not self.nesting_dim:
+            self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        else:
+            self.classifier = nn.Linear(self.nesting_dim, config.num_labels)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1593,6 +1598,8 @@ class BertForSequenceClassification(BertPreTrainedModel):
         pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
+        if self.nesting_dim:
+            pooled_output = pooled_output[:, :self.nesting_dim]
         logits = self.classifier(pooled_output)
 
         loss = None

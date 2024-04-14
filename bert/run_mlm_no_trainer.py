@@ -30,7 +30,7 @@ import os
 import random
 from itertools import chain
 from pathlib import Path
-
+import wandb
 import datasets
 import torch
 from accelerate import Accelerator, DistributedType
@@ -54,7 +54,7 @@ from transformers import (
 )
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-
+from modeling_bert import BertForMaskedLM
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 #check_min_version("4.40.0.dev0")
@@ -123,6 +123,21 @@ def parse_args():
         "--use_slow_tokenizer",
         action="store_true",
         help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library).",
+    )
+    parser.add_argument(
+        "--use_mrl",
+        action="store_true",
+        help="If passed, will use a MRL model."
+    )
+    parser.add_argument(
+        "--mrl_dim",
+        default=[48,96,192,384,768],
+        help="If passed, mrl embed dims",
+    )
+    parser.add_argument(
+        '--loss_weights',
+        default=[1,1,1,1,1],
+        help="loss weights for MRL model",
     )
     parser.add_argument(
         "--per_device_train_batch_size",
@@ -252,7 +267,12 @@ def parse_args():
         ),
     )
     args = parser.parse_args()
+    if isinstance(args.mrl_dim, str):
+        args.mrl_dim = args.mrl_dim.split(",")
+        args.mrl_dim = [int(x) for x in args.mrl_dim]
 
+    if isinstance(args.loss_weights, str):
+        args.loss_weights = args.loss_weights.split(",")
     # Sanity checks
     if args.dataset_name is None and args.train_file is None and args.validation_file is None:
         raise ValueError("Need either a dataset name or a training/validation file.")
@@ -285,11 +305,13 @@ def main():
     # in the environment
     accelerator_log_kwargs = {}
 
+    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps, **accelerator_log_kwargs)
+
     if args.with_tracking:
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
-
-    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps, **accelerator_log_kwargs)
+        if args.report_to in ['all', 'wandb'] and accelerator.is_main_process:
+            wandb_run = wandb.init(project='mlm_no_trainer')
 
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -422,7 +444,16 @@ def main():
         )
     else:
         logger.info("Training new model from scratch")
-        model = AutoModelForMaskedLM.from_config(config, trust_remote_code=args.trust_remote_code)
+        if args.use_mrl:
+            config.nesting_dim = args.mrl_dim
+            config.loss_weights = args.loss_weights
+        else:
+            config.nesting_dim = None
+            config.loss_weights = None
+        config.mrl_efficient = False
+
+
+        model = BertForMaskedLM(config=config)#, trust_remote_code=args.trust_remote_code)
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
@@ -681,6 +712,8 @@ def main():
                 # We keep track of the loss at each epoch
                 if args.with_tracking:
                     total_loss += loss.detach().float()
+                    if args.report_to in ['all', 'wandb'] and accelerator.is_local_main_process:
+                        wandb.log({'loss':loss.item(), 'learning_rate': optimizer.param_groups[0]['lr']})
                 accelerator.backward(loss)
                 optimizer.step()
                 lr_scheduler.step()
@@ -703,6 +736,7 @@ def main():
 
         model.eval()
         losses = []
+        print('Starting evaluation....')
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
                 outputs = model(**batch)
@@ -714,22 +748,26 @@ def main():
         try:
             eval_loss = torch.mean(losses)
             perplexity = math.exp(eval_loss)
+
         except OverflowError:
             perplexity = float("inf")
 
         logger.info(f"epoch {epoch}: perplexity: {perplexity} eval_loss: {eval_loss}")
 
         if args.with_tracking:
-            accelerator.log(
-                {
+            logging_dict = {
                     "perplexity": perplexity,
                     "eval_loss": eval_loss,
                     "train_loss": total_loss.item() / len(train_dataloader),
                     "epoch": epoch,
                     "step": completed_steps,
-                },
+                }
+            accelerator.log(
+                logging_dict,
                 step=completed_steps,
             )
+            if args.report_to in ['all', 'wandb'] and accelerator.is_main_process:
+                wandb.log(logging_dict)
 
         if args.push_to_hub and epoch < args.num_train_epochs - 1:
             accelerator.wait_for_everyone()
@@ -737,6 +775,7 @@ def main():
             unwrapped_model.save_pretrained(
                 args.output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save
             )
+
             if accelerator.is_main_process:
                 tokenizer.save_pretrained(args.output_dir)
                 api.upload_folder(

@@ -49,14 +49,22 @@ Note: Huggingface script bert/run_glue_no_trainer.py handles gradient accumulati
 
 Also `per_gpu_train_batch_size` is [total batch size](https://github.com/huggingface/transformers/issues/26548), per gpu would be divided by `num_processes` in accelerate config.
 
-    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 16 --learning_rate 2e-5 --num_train_epochs 5 --output_dir bert/tmp/ --pretrained_weights models_pretrained/bert-base-uncased_mrlFalse_bs128_lr1.0E-04_warmup10000_gradacc2/pytorch_model/mp_rank_00_model_states.pt  --max_length 128 --task_name stsb
+    accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 16 --learning_rate 2e-5 --num_train_epochs 5 --output_dir bert/tmp/ --pretrained_weights models_pretrained/bert-base-uncased_mrlFalse_bs128_lr1.0E-04_warmup10000_gradacc2/pytorch_model/mp_rank_00_model_states.pt  --max_length 128 --task_name stsb 
 
 To test using released model weights, remove `pretrained_weights` argument.
 
     accelerate launch --config_file bert/default_config.yaml bert/run_glue_no_trainer.py --model_name_or_path bert-base-uncased  --per_device_train_batch_size 16 --learning_rate 2e-5 --num_train_epochs 5 --output_dir bert/tmp/  --max_length 128 --task_name stsb
 
+CLIP zero shot evaluation in CLIP_benchmark 
+
+    python cli.py eval --dataset imagenet1k --weights_path ../models_pretrained/vit_bf16/mrl_false_mp_rank_00_model_states.pt --task "zeroshot_classification" --model ViT-B-32 --dataset_root root/
+
+    python cli.py eval --dataset mscoco_captions  --task "zeroshot_retrieval" --model ViT-B-16 --dataset_root ../text_image_datasets/coco/images/ --pretrained laion400m_e32
+
+
     
 Miscellaneous
+
 
 1. Check model name with `open_clip.list_models()` to pass argument for `model_name`. 
 Please check list of model names inside config folder in [open_clip](https://github.com/mlfoundations/open_clip/tree/main/src/open_clip/model_configs)
