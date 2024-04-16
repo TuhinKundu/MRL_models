@@ -1,3 +1,8 @@
+'''
+Adapted from https://github.com/huggingface/transformers/blob/main/examples/pytorch/language-modeling/run_mlm_no_trainer.py
+
+'''
+
 #!/usr/bin/env python
 # coding=utf-8
 # Copyright 2021 The HuggingFace Inc. team. All rights reserved.
@@ -801,7 +806,10 @@ def main():
         accelerator.end_training()
 
     if args.output_dir is not None:
+        output_dir = 'final_ckpt'
+        output_dir = os.path.join(args.output_dir, output_dir)
         accelerator.wait_for_everyone()
+        accelerator.save_state(output_dir)
         unwrapped_model = accelerator.unwrap_model(model)
         unwrapped_model.save_pretrained(
             args.output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save
