@@ -256,6 +256,11 @@ def parse_args():
         help="Whether to enable experiment trackers for logging.",
     )
     parser.add_argument(
+        "--freeze",
+        action="store_true",
+        help="Whether to freeze encoder for finetuning.",
+    )
+    parser.add_argument(
         "--report_to",
         type=str,
         default="all",
@@ -630,6 +635,7 @@ def main():
         else args.max_train_steps * accelerator.num_processes,
     )
 
+
     # Prepare everything with our `accelerator`.
     model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator._prepare_deepspeed(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
@@ -707,7 +713,23 @@ def main():
     progress_bar.update(completed_steps)
 
     for epoch in range(starting_epoch, args.num_train_epochs):
-        model.train()
+
+        if args.freeze:
+            for name, p in model.named_parameters():
+
+                if '.cls.' in name:
+                    p.requires_grad = True
+                else:
+                    p.requires_grad = False
+        else:
+            model.train()
+
+        for name, p in model.named_parameters():
+            print(name, p.requires_grad)
+
+        print("Total model parameters: ", sum(p.numel() for p in model.parameters()))
+        print("Total trainable parameters:", sum(p.numel() for p in model.parameters() if p.requires_grad))
+
         if args.with_tracking:
             total_loss = 0
         if args.resume_from_checkpoint and epoch == starting_epoch and resume_step is not None:
