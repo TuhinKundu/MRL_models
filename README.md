@@ -40,6 +40,12 @@ Example command to run clip pretraining
 
     accelerate launch --config_file clip_model/default_config.yaml run_pretraining.py --batch_size 8 --mrl yes --clip yes --data_path clip/cc3m/ --output_path output_dir/ --model_name ViT-B-32 --epochs 32
 
+#### Video-text finetuning 
+
+To run LAVENDER finetuning
+
+     torchrun --nproc_per_node=2 --master_port=5566 main_retrieval_task_specific.py --config _args/args_msrvtt-retrieval.json --path_output _snapshot --path_ckpt pretrained/lavender_scale_up_pretrain.pt 
+
 
 #### MLM finetuning
 
@@ -61,7 +67,12 @@ CLIP zero shot evaluation in CLIP_benchmark
 
     python cli.py eval --dataset mscoco_captions  --task "zeroshot_retrieval" --model ViT-B-16 --dataset_root ../text_image_datasets/coco/images/ --pretrained laion400m_e32
 
+#### Video compression
 
+
+
+
+    
     
 Miscellaneous
 
