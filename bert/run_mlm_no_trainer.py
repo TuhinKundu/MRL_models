@@ -635,6 +635,11 @@ def main():
         else args.max_train_steps * accelerator.num_processes,
     )
 
+    if os.path.isfile(args.resume_from_checkpoint):
+        ckpt = torch.load(args.resume_from_checkpoint)
+        state_dict = ckpt["module"]
+        msg = model.load_state_dict(state_dict)
+        resume_step=0
 
     # Prepare everything with our `accelerator`.
     model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator._prepare_deepspeed(
@@ -681,7 +686,7 @@ def main():
     starting_epoch = 0
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
+    if args.resume_from_checkpoint and os.path.isdir(args.resume_from_checkpoint):
         if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
             checkpoint_path = args.resume_from_checkpoint
             path = os.path.basename(args.resume_from_checkpoint)
